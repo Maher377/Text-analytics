@@ -1,0 +1,31 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  html_notebook: default
+  pdf_document: default
+toc: yes
+---
+
+ 
+```{r include=FALSE}
+library(readr)
+library(knitr)
+library(ggplot2)
+library(textcat)
+library(dplyr)
+library(ggplot2)
+library(tokenizers)
+library(tidytext)
+library(SnowballC)
+library(tm)
+library(stringi)
+library(ggrepel)
+WCR <- read.csv("~/Working Directory R/Womens Clothing E-Commerce Reviews.csv")
+```
+
+
+```{r}
+WCR$Tot_text <- (WCR$Title + WCR$Review.Text)
+```
+
