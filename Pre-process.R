@@ -1,21 +1,12 @@
 
+reviews_df <- Womens.Clothing.E.Commerce.Reviews
 
-```{r}
-print("number of reviews")
-nrow(reviews_df)
-```
 
-```{r}
-glimpse(reviews_df)
-```
-```{r}
-# let's take a subset to work with
-reviews_df <- reviews_df[1:50000,]
-```
+reviews_df$text_full <- paste(reviews_df$Title,reviews_df$Review.Text,sep = " ")
 
-```{r}
+
 #First stage of cleaning
-reviews_df$Review <- as.character(reviews_df$Review)  %>% 
+reviews_df$Review <- as.character(reviews_df$text_full)  %>% 
   tolower() %>% 
   {gsub(":( |-|o)*\\("," SADSMILE ", .)} %>%       # Find :( or :-( or : ( or :o(
   {gsub(":( |-|o)*\\)"," HAPPYSMILE ", .)} %>%     # Find :) or :-) or : ) or :o)
@@ -33,10 +24,9 @@ reviews_df$Review <- as.character(reviews_df$Review)  %>%
   {gsub(";+"," ", .)} %>%                          # Remove excess ;
   {gsub(" +"," ", .)} %>%                          # Remove excess spaces
   {gsub("\\.+","\\.", .)}                          # Remove excess .
-```
 
+reviews_df$Review
 
-```{r, echo=FALSE, message=FALSE}
 # # Creating the full review from the cleaned+stemmedwords
 # j<-1
 # for (j in 1:nrow(reviews_df)) {
