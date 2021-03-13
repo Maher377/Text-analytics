@@ -26,6 +26,6 @@ WCR <- read.csv("~/Working Directory R/Womens Clothing E-Commerce Reviews.csv")
 
 
 ```{r}
-WCR$Tot_text <- (WCR$Title + WCR$Review.Text)
+WCR$Tot_text <- WCR$ <- paste(data$F, data$E, data$D, data$C, sep="_")
 ```
 
