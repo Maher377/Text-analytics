@@ -17,7 +17,15 @@ library(SnowballC)
 library(tm)
 library(stringi)
 library(ggrepel)
-reviews_df <- read.csv("~/Working Directory R/Womens Clothing E-Commerce Reviews.csv")
+
+# wd Ertiza
+# wd Shane
+wd <- "C:/Users/mingh/Documents/Text-analytics"
+# wd Najla <- 
+setwd(wd)
+
+
+reviews_df <- read.csv("Womens Clothing E-Commerce Reviews.csv")
 ```
 
 
