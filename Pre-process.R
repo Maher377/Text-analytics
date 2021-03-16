@@ -78,7 +78,7 @@ nrow(counts)
 # Creating the full review from the cleaned+stemmedwords
 j<-1
 for (j in 1:nrow(reviews_df)) {
-  stemmed_description<-  anti_join((reviews_df[j,] %>% unnest_tokens(word,Description, drop=FALSE,to_lower=TRUE) ),stop_words)
+  stemmed_description<-  anti_join((reviews_df[j,] %>% unnest_tokens(word,Review, drop=FALSE,to_lower=TRUE) ),stop_words)
   
   stemmed_description<-(wordStem(stemmed_description[,"word"], language = "porter"))
   
