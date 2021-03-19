@@ -7,6 +7,10 @@ output:
 toc: yes
 ---
 
+```{r check reviews}
+head(reviews_df$Review, n=5)
+```
+
 ```{r loading libs and data, include=FALSE}
 library(tidyverse)
 library(dplyr)
@@ -20,11 +24,9 @@ library(ggrepel)
 reviews_df <- read.csv("~/Working Directory R/Womens Clothing E-Commerce Reviews.csv")
 ```
 
-
 ```{r merge title and review body}
 reviews_df$text_full <- paste(reviews_df$Title, reviews_df$Review.Text, sep = " ")
 ```
-
 
 ```{r Remove unnecessary punctuation}
 reviews_df$Review <- as.character(reviews_df$text_full)  %>% 
@@ -47,7 +49,6 @@ reviews_df$Review <- as.character(reviews_df$text_full)  %>%
   {gsub("\\.+","\\.", .)}                          # Remove excess .
 ```
 
-
 ```{r Remove stop words}
 #cut text into words by splitting on spaces and punctuation
 review_words <- reviews_df %>% unnest_tokens(word,Review,to_lower=TRUE) 
@@ -69,7 +70,6 @@ print("number of words without stop words")
 sum(counts$n)
 ```
 
-
 ```{r plot after removing stop words}
 counts %>% 
   mutate(word = reorder(word,n)) %>% 
@@ -81,7 +81,6 @@ counts %>%
   theme(text = element_text(size = 17)) + 
   ggtitle("Word Frequency Histogram")
 ```
-
 
 ```{r stemming}
 # Creating the full review from the cleaned+stemmedwords
@@ -95,7 +94,6 @@ counts %>%
    
  }
 ```
-
 
 ```{r new clean data plot}
 #cut text into words by splitting on spaces and punctuation
@@ -118,17 +116,48 @@ counts_clean %>%
 
 ```
 
-
-
-
-```{r}
-head(reviews_df$Review, n=5)
-```
-```{r}
+```{r wordcloud}
 wordcloud(words = counts_clean$word , freq = counts_clean$n, min.freq = 1000,
           max.words=70, random.order=FALSE, rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"))
 ```
+
+```{r dataframes for different reviews}
+wordcount_happy <- reviews_df %>% unnest_tokens(word,Review) %>% filter(Rating > 3) %>%count(word, sort=TRUE)
+names(wordcount_happy)[2] <- "n_happy"
+
+wordcount_unhappy <- reviews_df %>% unnest_tokens(word,Review) %>% filter(Rating < 2) %>%count(word, sort=TRUE)
+names(wordcount_unhappy)[2] <- "n_unhappy"
+```
+
+```{r}
+wordcount_happy %>% 
+  mutate(word = reorder(word,n_happy)) %>% 
+  top_n(20, word) %>%
+  ggplot(aes(word,n_happy)) +  
+  geom_col() + 
+  labs(x = NULL, y = "Number of occurences") + 
+  coord_flip() + 
+  theme(text = element_text(size = 17)) + 
+  ggtitle("Word Frequency Histogram Happy")
+```
+
+
+```{r}
+wordcount_unhappy %>% 
+  mutate(word = reorder(word,n_unhappy)) %>% 
+  top_n(20, word) %>%
+  ggplot(aes(word,n_unhappy)) +  
+  geom_col() + 
+  labs(x = NULL, y = "Number of occurences") + 
+  coord_flip() + 
+  theme(text = element_text(size = 17)) + 
+  ggtitle("Word Frequency Histogram Happy")
+```
+
+
+
+
 
 
 
