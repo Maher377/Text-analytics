@@ -17,6 +17,11 @@ library(SnowballC)
 library(tm)
 library(stringi)
 library(ggrepel)
+library(wordcloud)
+library(syuzhet)
+library(qdap)
+
+
 
 # wd Ertiza
 # wd Shane
@@ -133,13 +138,22 @@ counts_clean %>%
 head(reviews_df$Review, n=5)
 ```
 ```{r}
+# normal wordcloud
 wordcloud(words = counts_clean$word , freq = counts_clean$n, min.freq = 1000,
           max.words=70, random.order=FALSE, rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"))
+
+
+
+
+
 ```
 
 
+```{r}
 
+
+```
 
 
 
