@@ -1,13 +1,13 @@
 ---
 title: "R Notebook"
 output:
-  word_document: default
+  html_document:
+    df_print: paged
+  toc: yes
   html_notebook: default
-  pdf_document: default
-toc: yes
 ---
-
 ```{r loading libs and data, include=FALSE}
+#lecture 1
 library(tidyverse)
 library(dplyr)
 library(ggplot2)
@@ -18,26 +18,37 @@ library(tm)
 library(stringi)
 library(ggrepel)
 library(wordcloud)
+<<<<<<< HEAD
 library(syuzhet)
 library(qdap)
 
 
+=======
+
+#lecture 2
+library(smacof)
+library(ggfortify)
+library(ggthemes)
+library(stats)
+library(quanteda)
+
+#mds pcs
+library(factoextra)
+>>>>>>> 2392f7b45e4240cb8eea155e8d8be3cd6770e8da
 
 # wd Ertiza
 # wd Shane
-wd <- "C:/Users/mingh/Documents/Text-analytics"
+# wd <- "C:/Users/mingh/Documents/Text-analytics"
 # wd Najla <- 
-setwd(wd)
+# setwd(wd)
 
 
 reviews_df <- read.csv("Womens Clothing E-Commerce Reviews.csv")
 ```
 
-
-```{r merge title and review body}
+```{r merge title and review body, include=FALSE}
 reviews_df$text_full <- paste(reviews_df$Title, reviews_df$Review.Text, sep = " ")
 ```
-
 
 ```{r Remove unnecessary punctuation}
 reviews_df$Review <- as.character(reviews_df$text_full)  %>% 
@@ -60,8 +71,7 @@ reviews_df$Review <- as.character(reviews_df$text_full)  %>%
   {gsub("\\.+","\\.", .)}                          # Remove excess .
 ```
 
-
-```{r Remove stop words}
+```{r Remove stop words, include=FALSE}
 #cut text into words by splitting on spaces and punctuation
 review_words <- reviews_df %>% unnest_tokens(word,Review,to_lower=TRUE) 
 print("number of words")
@@ -82,7 +92,6 @@ print("number of words without stop words")
 sum(counts$n)
 ```
 
-
 ```{r plot after removing stop words}
 counts %>% 
   mutate(word = reorder(word,n)) %>% 
@@ -92,11 +101,10 @@ counts %>%
   labs(x = NULL, y = "Number of occurences") + 
   coord_flip() + 
   theme(text = element_text(size = 17)) + 
-  ggtitle("Word Frequency Histogram")
+  ggtitle("Word Frequency Histogram stop word removed")
 ```
 
-
-```{r stemming}
+```{r stemming, include=FALSE}
 # Creating the full review from the cleaned+stemmedwords
 
  for (j in 1:nrow(reviews_df)) {
@@ -109,8 +117,7 @@ counts %>%
  }
 ```
 
-
-```{r new clean data plot}
+```{r new clean data plot, echo=FALSE}
 #cut text into words by splitting on spaces and punctuation
 review_words_clean <- reviews_df %>% unnest_tokens(word,Review,to_lower=TRUE) 
 
@@ -126,20 +133,59 @@ counts_clean %>%
   labs(x = NULL, y = "Number of occurences") + 
   coord_flip() + 
   theme(text = element_text(size = 17)) + 
-  ggtitle("Word Frequency Histogram")
+  ggtitle("Word Frequency Histogram after stop and stem")
 
 
 ```
 
-
-
-
-```{r}
-head(reviews_df$Review, n=5)
+```{r wordcloud}
+wordcloud(words = counts_clean$word , freq = counts_clean$n, min.freq = 1000,
+          max.words=70, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
 ```
+
+```{r dataframes for different reviews, include=FALSE}
+wordcount_happy <- reviews_df %>% unnest_tokens(word,Review) %>% filter(Rating > 3) %>%count(word, sort=TRUE)
+names(wordcount_happy)[2] <- "n_happy"
+
+wordcount_unhappy <- reviews_df %>% unnest_tokens(word,Review) %>% filter(Rating < 2) %>%count(word, sort=TRUE)
+names(wordcount_unhappy)[2] <- "n_unhappy"
+```
+
+```{r plot happy}
+wordcount_happy %>% 
+  mutate(word = reorder(word,n_happy)) %>% 
+  top_n(20, word) %>%
+  ggplot(aes(word,n_happy)) +  
+  geom_col() + 
+  labs(x = NULL, y = "Number of occurences") + 
+  coord_flip() + 
+  theme(text = element_text(size = 17)) + 
+  ggtitle("Word Frequency Histogram Happy")
+
+wordcloud(words = wordcount_happy$word , freq = wordcount_happy$n, min.freq = 1000,
+          max.words=70, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+```
+<<<<<<< HEAD
 ```{r}
 # normal wordcloud
 wordcloud(words = counts_clean$word , freq = counts_clean$n, min.freq = 1000,
+=======
+
+```{r plot unhappy}
+wordcount_unhappy %>% 
+  mutate(word = reorder(word,n_unhappy)) %>% 
+  top_n(20, word) %>%
+  ggplot(aes(word,n_unhappy)) +  
+  geom_col() + 
+  labs(x = NULL, y = "Number of occurences") + 
+  coord_flip() + 
+  theme(text = element_text(size = 17)) + 
+  ggtitle("Word Frequency Histogram unHappy")
+
+wordcloud(words = wordcount_unhappy$word , freq = wordcount_unhappy$n, min.freq = 1000,
+>>>>>>> 2392f7b45e4240cb8eea155e8d8be3cd6770e8da
           max.words=70, random.order=FALSE, rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"))
 
@@ -149,11 +195,205 @@ wordcloud(words = counts_clean$word , freq = counts_clean$n, min.freq = 1000,
 
 ```
 
+**switching to document term matrix (this is the dfm (document frequency) format in quanteda )**
 
+<<<<<<< HEAD
 ```{r}
+=======
+So This plot is still normal frequency just using corpus
+```{r corpus setup, echo=FALSE}
+corpus <- corpus(reviews_df, docid_field = "X", text_field = "Review",  metacorpus = NULL, compress = TRUE)
+review.dfm <- dfm(corpus)
+wordfreqs <- colSums(as.matrix(review.dfm)) 
+wordfreqs <- data.frame(word = names(wordfreqs), n=wordfreqs)
+wordfreqs %>%
+  mutate(word = reorder(word,n)) %>% 
+  top_n(20, word) %>%
+  ggplot(aes(word,n)) +  
+  geom_col() + 
+  labs(x = NULL, y = "Number of occurences") + 
+  coord_flip() + 
+  theme(text = element_text(size = 17)) + 
+  ggtitle("Word Frequency Histogram corpus")
+```
+>>>>>>> 2392f7b45e4240cb8eea155e8d8be3cd6770e8da
 
+Going over to document frequency (How many documents contain these words pretty sure)
+```{r document frequency,echo=FALSE}
+docfreqs <- docfreq(review.dfm) %>% sort(decreasing = TRUE)
+docfreqs <- data.frame(word = names(docfreqs), n_docs=docfreqs)
+
+<<<<<<< HEAD
+```
+
+=======
+docfreqs %>%
+  mutate(word = reorder(word,n_docs)) %>% 
+  top_n(20, word) %>%
+  ggplot(aes(word,n_docs)) +  
+  geom_col() + 
+  labs(x = NULL, y = "Number of occurences") + 
+  coord_flip() + 
+  theme(text = element_text(size = 17)) + 
+  ggtitle("Document Frequency Histogram ")
+```
+
+```{r ratio dfs, include=FALSE}
+tf_idf_table <- merge(docfreqs, counts_clean)
+
+tf_idf_table$tf_idf <- tf_idf_table$n/tf_idf_table$n_docs
+
+tf_idf_table<-tf_idf_table[order(-tf_idf_table$tf_idf),]
+```
+
+I think it's these words because it's a ratio, I don't really get the point here might look tomorrow.
+```{r TF-IDF plot,echo=FALSE}
+tf_idf_table %>%
+  mutate(word = reorder(word,tf_idf)) %>% 
+  top_n(7, tf_idf) %>%
+  ggplot(aes(word,tf_idf)) +  
+  geom_col() + 
+  labs(x = NULL, y = "tf_idf") + 
+  coord_flip() + 
+  theme(text = element_text(size = 17)) + 
+  ggtitle("TF-IDF value ")
+```
+
+Plot happy unhappy ratios
+```{r ,include=FALSE}
+both_un_happy <- merge(wordcount_unhappy, wordcount_happy)
+
+both_un_happy$ratio <- both_un_happy$n_happy / both_un_happy$n_unhappy
+
+both_un_happy<-both_un_happy[order(-both_un_happy$ratio),]
+```
+
+```{r plot unhappy happy ratio, echo=FALSE}
+both_un_happy %>%
+  mutate(word = reorder(word,ratio)) %>% 
+  top_n(20, ratio) %>%
+  ggplot(aes(word,ratio)) +  
+  geom_col() + 
+  labs(x = NULL, y = "ratio") + 
+  coord_flip() + 
+  theme(text = element_text(size = 17)) + 
+  ggtitle("Relatively most frequent words in happy ")
+
+both_un_happy %>%
+  mutate(word = reorder(word,-ratio)) %>% 
+  top_n(-14, ratio) %>%
+  ggplot(aes(word,ratio)) +  
+  geom_col() + 
+  labs(x = NULL, y = "ratio") + 
+  coord_flip() + 
+  theme(text = element_text(size = 17)) + 
+  ggtitle("Relatively most frequent words in unhappy ")
+```
+
+```{r setup and comparisionclouds,echo=FALSE}
+reviews_df$happy <- "happy"
+reviews_df[reviews_df$Rating <3,]$happy <- "unhappy"
+compare_matrix_binary <- reviews_df %>% unnest_tokens(word,Review) %>%count(word,happy,sort=TRUE) %>%ungroup()%>%cast_tdm(word,happy,n)
+compare_matrix_rating <- reviews_df %>% unnest_tokens(word,Review) %>%count(word,Rating,sort=TRUE) %>%ungroup()%>%cast_tdm(word,Rating,n)
+
+comparison.cloud(as.matrix(compare_matrix_binary), scale=c(3,0.5), random.order=FALSE, colors = c("indianred3","lightsteelblue3"),
+ max.words=30, rot.per = 0.3)
+
+comparison.cloud(as.matrix(compare_matrix_rating), scale=c(3,0.5), random.order=FALSE, colors = c("lightblue", "pink", "yellow", "lightgreen", "grey"), 
+ max.words=30, rot.per = 0.3)
+```
+For some reason this does not work, I don't really know why though. It does seem to work if i paste the code into the console.
+```{rcommonality cloud, echo=FALSE}
+commonality.cloud(as.matrix(compare_matrix_binary), scale=c(3,0.5), random.order=FALSE, colors=brewer.pal(8, "Dark2"),
+                  max.words=30, rot.per = 0.3)
+commonality.cloud(as.matrix(compare_matrix_rating), scale=c(3,0.5), random.order=FALSE, colors=brewer.pal(8, "Dark2"),
+                  max.words=30, rot.per = 0.3)
 
 ```
 
+```{r filter infrequent words, message=FALSE, warning=FALSE, include=FALSE}
+#can use this maybe I think this is correct?
+infrequent <- counts_clean %>% filter(n<0.01*nrow(counts_clean))
+frequent <- counts_clean %>% filter(n>0.01*nrow(counts_clean))
+toremove <- infrequent
+
+for (j in 1:nrow(reviews_df)) {
+ stemmed_Review<-  anti_join((reviews_df[j,] %>% unnest_tokens(word,Review,to_lower=TRUE) ),toremove)
+  
+ reviews_df[j,"Review_after_infreq"]<-   paste((stemmed_Review[,"word"]),collapse = " ")
+
+}
+```
+## MDS document
+```{r MDS document,echo=FALSE, message=FALSE, warning=FALSE}
+reviews_corp <- corpus(reviews_df, docid_field = "X", text_field = "Review")
+
+# feature cooccurrence matrix : fcm()
+co_occurrence_matrix <- fcm(x = reviews_corp, context = "document", count = "frequency", tri=FALSE)
+
+reviews_dfm <- dfm(reviews_corp) # get document frequency matrix
+counts_dfm <- colSums(as.matrix(reviews_dfm)) 
+co_occurrence_matrix <- as.matrix(co_occurrence_matrix)
+diag(co_occurrence_matrix) <- counts_dfm
+
+sortedcount <- counts_dfm%>% sort(decreasing=TRUE)
+sortednames <- names(sortedcount)
+nwords<-200
+subset_words<-as.matrix(sortedcount[1:nwords])
+co_occurrence_matrix <- co_occurrence_matrix[sortednames[1:nwords],sortednames[1:nwords]]
+co_occurrence_matrix[1:15,1:15]
+distances <- sim2diss(co_occurrence_matrix, method = "cooccurrence") # Transform similarities to distances.
+MDS_map <- smacofSym(distances) # run the routine that finds the best matching coordinates in a 2D mp given the distances
+ggplot(as.data.frame(MDS_map$conf), aes(D1, D2, label = rownames(MDS_map$conf))) +
+     geom_text(check_overlap = TRUE) + theme_minimal(base_size = 15) + xlab('') + ylab('') +
+     scale_y_continuous(breaks = NULL) + scale_x_continuous(breaks = NULL)
+# the conf element in the MDS output contains the coordinatis with as names D1 and D2.
+```
+## MDS window = 1
+```{r MDS window is  1, echo=FALSE}
+co_occurrence_matrix <- fcm(x = reviews_corp, context = "window", window=1, count = "frequency", tri=FALSE)
+
+co_occurrence_matrix<-co_occurrence_matrix[sortednames[1:nwords],sortednames[1:nwords]]
+
+diag(co_occurrence_matrix) <- counts_dfm[sortednames[1:nwords]]
+co_occurrence_matrix[1:15,1:15]
+distances <- sim2diss(co_occurrence_matrix, method = "cooccurrence") # Transform similarities to distances.
+min(distances) #check whethet minimum distance is positive. Sometimes the counting procedure did something unexpected.
+max(distances) #check whethet minimum distance is positive. Sometimes the counting procedure did something unexpected.
+MDS_map <- smacofSym(distances) # run the routine that finds the best matching coordinates in a 2D mp given the distances
+ggplot(as.data.frame(MDS_map$conf), aes(D1, D2, label = rownames(MDS_map$conf))) +
+     geom_text(check_overlap = TRUE) + theme_minimal(base_size = 15) + xlab('') + ylab('') +
+     scale_y_continuous(breaks = NULL) + scale_x_continuous(breaks = NULL)
+# the conf element in the MDS output contains the coordinatis with as names D1 and D2.
+```
+## MDS window = 5
+```{r MDS window is  5, echo=FALSE}
+co_occurrence_matrix <- fcm(x = reviews_corp, context = "window", window=5, count = "boolean", tri=FALSE)
+
+co_occurrence_matrix<-co_occurrence_matrix[sortednames[1:nwords],sortednames[1:nwords]]
+
+diag(co_occurrence_matrix) <- counts_dfm[sortednames[1:nwords]]
+co_occurrence_matrix[1:15,1:15]
+distances <- sim2diss(co_occurrence_matrix, method = "cooccurrence") # Transform similarities to distances.
+MDS_map <- smacofSym(distances) # run the routine that finds the best matching coordinates in a 2D map given the distances
+ggplot(as.data.frame(MDS_map$conf), aes(D1, D2, label = rownames(MDS_map$conf))) +
+     geom_text(check_overlap = TRUE) + theme_minimal(base_size = 15) + xlab('') + ylab('') +
+     scale_y_continuous(breaks = NULL) + scale_x_continuous(breaks = NULL)
+# the conf element in the MDS output contains the coordinatis with as names D1 and D2.
+```
+
+
+```{r PCA, echo=FALSE}
+review_tdm <- reviews_df %>% unnest_tokens(word,Review_after_infreq) %>%count(word,X,sort=TRUE) %>%ungroup()%>%cast_tdm(word,X,n)
+
+counts <- rowSums(as.matrix(review_tdm)) 
+sortedcount <- counts%>% sort(decreasing=TRUE)
+nwords<-200
+sortednames <- names(sortedcount[1:nwords])
+pca_results <- prcomp(t(review_tdm[,1:10000]), scale = FALSE, rank. = 50) # why do we set scale to FALSE? -> All data is measured on the same scale 
+pca_results_backup <- pca_results  # create a backup of results for later use
+fviz_screeplot(pca_results,ncp=30)
+```
+>>>>>>> 2392f7b45e4240cb8eea155e8d8be3cd6770e8da
 
 
