@@ -1,11 +1,12 @@
 library("wordcloud")
 library("quanteda")
+library(dplyr)
 
 
-reviews_df <- Womens.Clothing.E.Commerce.Reviews
+reviews_df <- Womens_Clothing_E_Commerce_Reviews
 
 
-reviews_df$text_full <- paste(reviews_df$Title,reviews_df$Review.Text,sep = " ")
+reviews_df$text_full <- paste(reviews_df$Title,reviews_df$`Review Text`,sep = " ")
 
 
 #First stage of cleaning ----
@@ -78,10 +79,12 @@ nrow(counts)
 # Creating the full review from the cleaned+stemmedwords
 j<-1
 for (j in 1:nrow(reviews_df)) {
-  stemmed_description<-  anti_join((reviews_df[j,] %>% unnest_tokens(word,Description, drop=FALSE,to_lower=TRUE) ),stop_words)
+  stemmed_description<-  anti_join((reviews_df[j,] %>% unnest_tokens(word,Review, drop=FALSE,to_lower=TRUE) ),stop_words)
   
   stemmed_description<-(wordStem(stemmed_description[,"word"], language = "porter"))
   
   reviews_df[j,"Description"]<-paste((stemmed_description),collapse = " ")
   
 }
+
+
