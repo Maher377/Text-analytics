@@ -18,12 +18,11 @@ library(tm)
 library(stringi)
 library(ggrepel)
 library(wordcloud)
-<<<<<<< HEAD
 library(syuzhet)
 library(qdap)
 
 
-=======
+# ----
 
 #lecture 2
 library(smacof)
@@ -34,7 +33,6 @@ library(quanteda)
 
 #mds pcs
 library(factoextra)
->>>>>>> 2392f7b45e4240cb8eea155e8d8be3cd6770e8da
 
 # wd Ertiza
 # wd Shane
@@ -167,11 +165,6 @@ wordcloud(words = wordcount_happy$word , freq = wordcount_happy$n, min.freq = 10
           max.words=70, random.order=FALSE, rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"))
 ```
-<<<<<<< HEAD
-```{r}
-# normal wordcloud
-wordcloud(words = counts_clean$word , freq = counts_clean$n, min.freq = 1000,
-=======
 
 ```{r plot unhappy}
 wordcount_unhappy %>% 
@@ -184,12 +177,10 @@ wordcount_unhappy %>%
   theme(text = element_text(size = 17)) + 
   ggtitle("Word Frequency Histogram unHappy")
 
+
 wordcloud(words = wordcount_unhappy$word , freq = wordcount_unhappy$n, min.freq = 1000,
->>>>>>> 2392f7b45e4240cb8eea155e8d8be3cd6770e8da
           max.words=70, random.order=FALSE, rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"))
-
-
 
 
 
@@ -197,10 +188,8 @@ wordcloud(words = wordcount_unhappy$word , freq = wordcount_unhappy$n, min.freq 
 
 **switching to document term matrix (this is the dfm (document frequency) format in quanteda )**
 
-<<<<<<< HEAD
-```{r}
-=======
-So This plot is still normal frequency just using corpus
+
+
 ```{r corpus setup, echo=FALSE}
 corpus <- corpus(reviews_df, docid_field = "X", text_field = "Review",  metacorpus = NULL, compress = TRUE)
 review.dfm <- dfm(corpus)
@@ -216,17 +205,11 @@ wordfreqs %>%
   theme(text = element_text(size = 17)) + 
   ggtitle("Word Frequency Histogram corpus")
 ```
->>>>>>> 2392f7b45e4240cb8eea155e8d8be3cd6770e8da
 
 Going over to document frequency (How many documents contain these words pretty sure)
 ```{r document frequency,echo=FALSE}
 docfreqs <- docfreq(review.dfm) %>% sort(decreasing = TRUE)
 docfreqs <- data.frame(word = names(docfreqs), n_docs=docfreqs)
-
-<<<<<<< HEAD
-```
-
-=======
 docfreqs %>%
   mutate(word = reorder(word,n_docs)) %>% 
   top_n(20, word) %>%
@@ -303,7 +286,7 @@ comparison.cloud(as.matrix(compare_matrix_rating), scale=c(3,0.5), random.order=
  max.words=30, rot.per = 0.3)
 ```
 For some reason this does not work, I don't really know why though. It does seem to work if i paste the code into the console.
-```{rcommonality cloud, echo=FALSE}
+```{r rcommonality cloud, echo= false}
 commonality.cloud(as.matrix(compare_matrix_binary), scale=c(3,0.5), random.order=FALSE, colors=brewer.pal(8, "Dark2"),
                   max.words=30, rot.per = 0.3)
 commonality.cloud(as.matrix(compare_matrix_rating), scale=c(3,0.5), random.order=FALSE, colors=brewer.pal(8, "Dark2"),
@@ -393,7 +376,22 @@ sortednames <- names(sortedcount[1:nwords])
 pca_results <- prcomp(t(review_tdm[,1:10000]), scale = FALSE, rank. = 50) # why do we set scale to FALSE? -> All data is measured on the same scale 
 pca_results_backup <- pca_results  # create a backup of results for later use
 fviz_screeplot(pca_results,ncp=30)
-```
->>>>>>> 2392f7b45e4240cb8eea155e8d8be3cd6770e8da
 
+# summary the information of each component
+print(summary(pca_results, loadings = TRUE, cutoff = 0.4), digits = 2)
+
+op <- par(mfrow = c(1, 1))
+biplot(pca_results, pc.biplot = TRUE, scale = 0.8, choices = 2:3, col = c("blue", "red"),
+       asp = 1, cex = c(0.5, 1), main = "Biplot components 1 and 2")
+par(op)
+
+```
+
+
+```{r}
+
+
+
+
+```
 
