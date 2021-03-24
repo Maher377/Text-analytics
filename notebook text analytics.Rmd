@@ -61,7 +61,8 @@ reviews_df$Review <- as.character(reviews_df$text_full)  %>%
   {gsub("_+"," ", .)} %>%                          # Remove all _
   {gsub(";+"," ", .)} %>%                          # Remove excess ;
   {gsub(" +"," ", .)} %>%                          # Remove excess spaces
-  {gsub("\\.+","\\.", .)}                          # Remove excess .
+  {gsub("\\.+","\\.", .)} %>%                      # Remove excess .
+  {gsub("\'\"+"," ", .)} %>%                         # Remove all '
 ```
 
 ```{r Remove stop words, include=FALSE}
@@ -356,7 +357,6 @@ ggplot(as.data.frame(MDS_map$conf), aes(D1, D2, label = rownames(MDS_map$conf)))
 # the conf element in the MDS output contains the coordinatis with as names D1 and D2.
 ```
 
-
 ```{r PCA, echo=FALSE}
 review_tdm <- reviews_df %>% unnest_tokens(word,Review_after_infreq) %>%count(word,X,sort=TRUE) %>%ungroup()%>%cast_tdm(word,X,n)
 
@@ -364,9 +364,10 @@ counts <- rowSums(as.matrix(review_tdm))
 sortedcount <- counts%>% sort(decreasing=TRUE)
 nwords<-200
 sortednames <- names(sortedcount[1:nwords])
-pca_results <- prcomp(t(review_tdm[,1:10000]), scale = FALSE, rank. = 50) # why do we set scale to FALSE? -> All data is measured on the same scale 
+pca_results <- prcomp(t(review_tdm), scale = FALSE, rank. = 50) # why do we set scale to FALSE? -> All data is measured on the same scale 
 pca_results_backup <- pca_results  # create a backup of results for later use
 fviz_screeplot(pca_results,ncp=30)
+
 ```
 
 
