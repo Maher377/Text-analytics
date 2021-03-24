@@ -34,6 +34,11 @@ library(quanteda)
 #mds pcs
 library(factoextra)
 
+#lecture 3
+library(syuzhet)
+# maybe needed
+# options(stringsAsFactors = FALSE)
+
 # wd Ertiza
 # wd Shane
 # wd <- "C:/Users/mingh/Documents/Text-analytics"
@@ -379,13 +384,10 @@ fviz_screeplot(pca_results,ncp=30)
 
 ```
 
-
 ```{r}
 ncomp<-4
 pca_results_backup -> pca_results #restore original to play with number of components and rotations
 ```
-
-
 
 ```{r}
 #select the most important words per dimension
@@ -401,7 +403,6 @@ topwords <-cbind( topwords , (names(toplist)))
 topwords
 
 ```
-
 
 ```{r warning = FALSE}
 axeslist <- c(3, 4)
@@ -424,5 +425,46 @@ pca_results$x <- scale(pca_results$x[,1:ncomp]) %*% rotated$rotmat
 
 print("PCA finished")
 
+```
+
+```{r change the text and make sentiment words, include=FALSE}
+reviews_df$text_full <- as.character(reviews_df$text_full)  %>% 
+  tolower() %>% 
+  {gsub(":( |-|o)*\\("," SADSMILE ", .)} %>%       # Find :( or :-( or : ( or :o(
+  {gsub(":( |-|o)*\\)"," HAPPYSMILE ", .)} %>%     # Find :) or :-) or : ) or :o)
+  {gsub("(\"| |\\$)-+\\.-+"," NUMBER", .)} %>%     # Find numbers
+  {gsub("([0-9]+:)*[0-9]+ *am"," TIME_AM", .)} %>%         # Find time AM
+  {gsub("([0-9]+:)*[0-9]+ *pm"," TIME_PM", .)} %>%         # Find time PM
+  {gsub("-+:-+","TIME", .)} %>%                    # Find general time
+  {gsub("\\$ ?[0-9]*[\\.,]*[0-9]+"," DOLLARVALUE ", .)} %>%           # Find Dollar values
+  {gsub("[0-9]*[\\.,]*[0-9]+"," NUMBER ", .)} %>%           # Find remaining numbers
+  {gsub("-"," ", .)} %>%                           # Remove all -
+  {gsub("&"," and ", .)} %>%                       # Find general time
+  {gsub("\"+"," ", .)} %>%                         # Remove all "
+  {gsub("\\|+"," ", .)} %>%                        # Remove all |
+  {gsub("_+"," ", .)} %>%                          # Remove all _
+  {gsub(";+"," ", .)} %>%                          # Remove excess ;
+  {gsub(" +"," ", .)} %>%                          # Remove excess spaces
+  {gsub("\\.+","\\.", .)} %>%                      # Remove excess .
+  {gsub("\'\"+"," ", .)}                      # Remove all '
+
+all_words <- reviews_df[,] %>%
+             unnest_tokens("text_full", output = "word") %>%
+             anti_join(stop_words, by = "word") %>%
+             count(word, sort = TRUE) %>%
+             filter(n>50)
+
+sentiment_scores <- polarity(all_words$word)$all        # get sentiment with polarity function
+all_words$sentiment <- sentiment_scores[,"polarity"]
+
+all_words %>%
+  filter(sentiment != 0) %>%
+  mutate(n = ifelse(sentiment == -1, -n, n)) %>%
+  mutate(word = reorder(word, n)) %>%
+  mutate(Sentiment = ifelse(sentiment == 1, "Postive","Negative")) %>%
+  ggplot(aes(word, n, fill = Sentiment)) +
+  geom_col() +
+  coord_flip() +
+  labs(y = "Contribution to \"total\" sentiment", x = "Word (min freq = 50)")
 ```
 
