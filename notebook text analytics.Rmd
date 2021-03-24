@@ -18,6 +18,11 @@ library(tm)
 library(stringi)
 library(ggrepel)
 library(wordcloud)
+library(syuzhet)
+library(qdap)
+
+
+# ----
 
 #lecture 2
 library(smacof)
@@ -173,14 +178,19 @@ wordcount_unhappy %>%
   theme(text = element_text(size = 17)) + 
   ggtitle("Word Frequency Histogram unHappy")
 
+
 wordcloud(words = wordcount_unhappy$word , freq = wordcount_unhappy$n, min.freq = 1000,
           max.words=70, random.order=FALSE, rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"))
+
+
+
 ```
 
 **switching to document term matrix (this is the dfm (document frequency) format in quanteda )**
 
-So This plot is still normal frequency just using corpus
+
+
 ```{r corpus setup, echo=FALSE}
 corpus <- corpus(reviews_df, docid_field = "X", text_field = "Review",  metacorpus = NULL, compress = TRUE)
 review.dfm <- dfm(corpus)
@@ -201,7 +211,6 @@ Going over to document frequency (How many documents contain these words pretty 
 ```{r document frequency,echo=FALSE}
 docfreqs <- docfreq(review.dfm) %>% sort(decreasing = TRUE)
 docfreqs <- data.frame(word = names(docfreqs), n_docs=docfreqs)
-
 docfreqs %>%
   mutate(word = reorder(word,n_docs)) %>% 
   top_n(20, word) %>%
@@ -278,7 +287,7 @@ comparison.cloud(as.matrix(compare_matrix_rating), scale=c(3,0.5), random.order=
  max.words=30, rot.per = 0.3)
 ```
 For some reason this does not work, I don't really know why though. It does seem to work if i paste the code into the console.
-```{rcommonality cloud, echo=FALSE}
+```{r rcommonality cloud, echo= false}
 commonality.cloud(as.matrix(compare_matrix_binary), scale=c(3,0.5), random.order=FALSE, colors=brewer.pal(8, "Dark2"),
                   max.words=30, rot.per = 0.3)
 commonality.cloud(as.matrix(compare_matrix_rating), scale=c(3,0.5), random.order=FALSE, colors=brewer.pal(8, "Dark2"),
@@ -370,4 +379,50 @@ fviz_screeplot(pca_results,ncp=30)
 
 ```
 
+
+```{r}
+ncomp<-4
+pca_results_backup -> pca_results #restore original to play with number of components and rotations
+```
+
+
+
+```{r}
+#select the most important words per dimension
+
+j<-1
+toplist <- abs(pca_results$rotation[,j]) %>% sort(decreasing=TRUE) %>% head(10)
+topwords <- (names(toplist))
+for (j in 2:ncomp){
+toplist <- abs(pca_results$rotation[,j]) %>% sort(decreasing=TRUE) %>% head(10)
+topwords <-cbind( topwords , (names(toplist)))
+  }
+
+topwords
+
+```
+
+
+```{r warning = FALSE}
+axeslist <- c(3, 4)
+fviz_pca_var(pca_results, axes=axeslist 
+             ,geom.var = c("arrow", "text")
+              ,col.var = "contrib", # Color by contributions to the PC
+              gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+              repel = TRUE     # Avoid text overlapping
+             )
+
+```
+
+```{r}
+
+rawLoadings     <- pca_results$rotation[sortednames,1:ncomp] %*% diag(pca_results$sdev, ncomp, ncomp)
+rotated <- varimax(rawLoadings)
+pca_results$rotation <- rotated$loadings
+pca_results$x <- scale(pca_results$x[,1:ncomp]) %*% rotated$rotmat
+
+
+print("PCA finished")
+
+```
 
