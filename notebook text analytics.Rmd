@@ -72,7 +72,7 @@ reviews_df$Review <- as.character(reviews_df$text_full)  %>%
   {gsub(";+"," ", .)} %>%                          # Remove excess ;
   {gsub(" +"," ", .)} %>%                          # Remove excess spaces
   {gsub("\\.+","\\.", .)} %>%                      # Remove excess .
-  {gsub("\'\"+"," ", .)} %>%                         # Remove all '
+  {gsub("\'\"+"," ", .)}                          # Remove all '
 ```
 
 ```{r Remove stop words, include=FALSE}
@@ -291,7 +291,8 @@ comparison.cloud(as.matrix(compare_matrix_binary), scale=c(3,0.5), random.order=
 comparison.cloud(as.matrix(compare_matrix_rating), scale=c(3,0.5), random.order=FALSE, colors = c("lightblue", "pink", "yellow", "lightgreen", "grey"), 
  max.words=30, rot.per = 0.3)
 ```
-For some reason this does not work, I don't really know why though. It does seem to work if i paste the code into the console.
+
+
 ```{r rcommonality cloud, echo= false}
 commonality.cloud(as.matrix(compare_matrix_binary), scale=c(3,0.5), random.order=FALSE, colors=brewer.pal(8, "Dark2"),
                   max.words=30, rot.per = 0.3)
@@ -385,7 +386,7 @@ fviz_screeplot(pca_results,ncp=30)
 ```
 
 ```{r}
-ncomp<-4
+ncomp<-6
 pca_results_backup -> pca_results #restore original to play with number of components and rotations
 ```
 
@@ -405,7 +406,7 @@ topwords
 ```
 
 ```{r warning = FALSE}
-axeslist <- c(3, 4)
+axeslist <- c(1, 2)
 fviz_pca_var(pca_results, axes=axeslist 
              ,geom.var = c("arrow", "text")
               ,col.var = "contrib", # Color by contributions to the PC
@@ -468,3 +469,23 @@ all_words %>%
   labs(y = "Contribution to \"total\" sentiment", x = "Word (min freq = 50)")
 ```
 
+
+```{r sentiment score}
+pol <- polarity(reviews_df[, "text_full"])$all
+reviews_df$polarity <- pol[, "polarity"]
+reviews_df$sent_bing  <- get_sentiment(reviews_df$text_full, method = "bing")
+
+```
+
+
+```{r}
+pos_reviews      <- reviews_df %>% filter(happy == "happy")
+neg_reviews      <- reviews_df %>% filter(happy == "unhappy")
+
+for (v in c("sent_bing","polarity"))
+{
+  cat(v)
+  cat(" ", mean(neg_reviews[, v]), " ", mean(pos_reviews[, v]), "\n")
+}
+
+```
