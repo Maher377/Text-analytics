@@ -1,12 +1,10 @@
 ---
 title: "R Notebook"
 output:
-  html_document:
-    df_print: paged
-  toc: yes
-  html_notebook: default
+  html_notebook:
+    toc: yes
 ---
-```{r loading libs and data, include=FALSE}
+```{r loading libs and data, message=FALSE, warning=FALSE, include=FALSE}
 #lecture 1
 library(tidyverse)
 library(dplyr)
@@ -20,20 +18,15 @@ library(ggrepel)
 library(wordcloud)
 library(syuzhet)
 library(qdap)
-
-
-# ----
-
+library(readr)
 #lecture 2
 library(smacof)
 library(ggfortify)
 library(ggthemes)
 library(stats)
 library(quanteda)
-
 #mds pcs
 library(factoextra)
-
 #lecture 3
 library(syuzhet)
 # maybe needed
@@ -44,14 +37,26 @@ library(syuzhet)
 # wd <- "C:/Users/mingh/Documents/Text-analytics"
 # wd Najla <- 
 # setwd(wd)
-
-
 reviews_df <- read.csv("Womens Clothing E-Commerce Reviews.csv")
 ```
+
+# Cleaning and stemming
 
 ```{r merge title and review body, include=FALSE}
 reviews_df$text_full <- paste(reviews_df$Title, reviews_df$Review.Text, sep = " ")
 ```
+
+I remove row without text here.
+```{r remove rows without text ,include=FALSE}
+reviews_df <- reviews_df[!(reviews_df$text_full == " "), ]
+```
+
+I add rating variable in binairy here
+```{r}
+reviews_df$Rating_b <- "happy"
+reviews_df[reviews_df$Rating < 4,]$Rating_b <- "unhappy"
+```
+
 
 ```{r Remove unnecessary punctuation}
 reviews_df$Review <- as.character(reviews_df$text_full)  %>% 
@@ -72,35 +77,16 @@ reviews_df$Review <- as.character(reviews_df$text_full)  %>%
   {gsub(";+"," ", .)} %>%                          # Remove excess ;
   {gsub(" +"," ", .)} %>%                          # Remove excess spaces
   {gsub("\\.+","\\.", .)} %>%                      # Remove excess .
-<<<<<<< HEAD
   {gsub("\'\"+"," ", .)}                        # Remove all '
-=======
-  {gsub("\'\"+"," ", .)}                          # Remove all '
->>>>>>> e64a0ef090730875a8b8b1a1ccbdd2ce0076f9a1
 ```
 
-```{r Remove stop words, include=FALSE}
+```{r Remove stop words + barplot freq words, echo=FALSE}
 #cut text into words by splitting on spaces and punctuation
 review_words <- reviews_df %>% unnest_tokens(word,Review,to_lower=TRUE) 
-print("number of words")
-nrow(review_words)
-
-#Count the number of times each word occurs
-counts <- review_words %>%count(word, sort=TRUE) # sort = TRUE for sorting in descending order of n. 
-# For questions about a function type ?fun in the console. For example ?count
-print("number of unique words")
-nrow(counts)
-
-review_words_nostop <- review_words %>% 
+review_words <- review_words %>% 
                         anti_join(stop_words)
 counts <- review_words_nostop %>%
             count(word, sort=TRUE)
-
-print("number of words without stop words")
-sum(counts$n)
-```
-
-```{r plot after removing stop words}
 counts %>% 
   mutate(word = reorder(word,n)) %>% 
   top_n(30, word) %>%
@@ -112,28 +98,25 @@ counts %>%
   ggtitle("Word Frequency Histogram stop word removed")
 ```
 
-```{r stemming, include=FALSE}
+```{r stemming, message=FALSE, warning=FALSE, include=FALSE}
 # Creating the full review from the cleaned+stemmedwords
 
- for (j in 1:nrow(reviews_df)) {
+for (j in 1:nrow(reviews_df)) {
   stemmed_Review<-  anti_join((reviews_df[j,] %>% unnest_tokens(word,Review, drop=FALSE,to_lower=TRUE) ),stop_words)
    
   stemmed_Review<-(wordStem(stemmed_Review[,"word"], language = "porter"))
  
-  reviews_df[j,"Review"]<-paste((stemmed_Review),collapse = " ")
+  reviews_df[j,"Review_stem"]<-paste((stemmed_Review),collapse = " ")
    
  }
 ```
 
-```{r new clean data plot, echo=FALSE}
+```{r plot stemmed words, echo=FALSE, message=FALSE, warning=FALSE}
 #cut text into words by splitting on spaces and punctuation
-review_words_clean <- reviews_df %>% unnest_tokens(word,Review,to_lower=TRUE) 
+review_words_stem <- reviews_df %>% unnest_tokens(word,Review_stem,to_lower=TRUE) 
+counts <- review_words_stem %>%count(word, sort=TRUE) 
 
-#Count the number of times each word occurs
-counts_clean <- review_words_clean %>%count(word, sort=TRUE) # sort = TRUE for sorting in descending order of n. 
-# For questions about a function type ?fun in the console. For example ?count
-
-counts_clean %>% 
+counts %>% 
   mutate(word = reorder(word,n)) %>% 
   top_n(30, word) %>%
   ggplot(aes(word,n)) +  
@@ -143,23 +126,24 @@ counts_clean %>%
   theme(text = element_text(size = 17)) + 
   ggtitle("Word Frequency Histogram after stop and stem")
 
-
 ```
 
+# plotting simple vis
+
 ```{r wordcloud}
-wordcloud(words = counts_clean$word , freq = counts_clean$n, min.freq = 1000,
+wordcloud(words = counts$word , freq = counts$n, min.freq = 1000,
           max.words=70, random.order=FALSE, rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"))
 ```
 
 ```{r dataframes for different reviews, include=FALSE}
-wordcount_happy <- reviews_df %>% unnest_tokens(word,Review) %>% filter(Rating > 3) %>%count(word, sort=TRUE)
+wordcount_happy <- reviews_df %>% unnest_tokens(word,Review_stem) %>% filter(Rating > 3) %>%count(word, sort=TRUE)
 names(wordcount_happy)[2] <- "n_happy"
 
-wordcount_unhappy <- reviews_df %>% unnest_tokens(word,Review) %>% filter(Rating < 2) %>%count(word, sort=TRUE)
+wordcount_unhappy <- reviews_df %>% unnest_tokens(word,Review_stem) %>% filter(Rating < 2) %>%count(word, sort=TRUE)
 names(wordcount_unhappy)[2] <- "n_unhappy"
 ```
-
+## happy 
 ```{r plot happy}
 wordcount_happy %>% 
   mutate(word = reorder(word,n_happy)) %>% 
@@ -175,7 +159,7 @@ wordcloud(words = wordcount_happy$word , freq = wordcount_happy$n, min.freq = 10
           max.words=70, random.order=FALSE, rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"))
 ```
-
+## unhappy
 ```{r plot unhappy}
 wordcount_unhappy %>% 
   mutate(word = reorder(word,n_unhappy)) %>% 
@@ -197,11 +181,9 @@ wordcloud(words = wordcount_unhappy$word , freq = wordcount_unhappy$n, min.freq 
 ```
 
 **switching to document term matrix (this is the dfm (document frequency) format in quanteda )**
-
-
-
+word freq total
 ```{r corpus setup, echo=FALSE}
-corpus <- corpus(reviews_df, docid_field = "X", text_field = "Review",  metacorpus = NULL, compress = TRUE)
+corpus <- corpus(reviews_df, docid_field = "X", text_field = "Review_stem",  metacorpus = NULL, compress = TRUE)
 review.dfm <- dfm(corpus)
 wordfreqs <- colSums(as.matrix(review.dfm)) 
 wordfreqs <- data.frame(word = names(wordfreqs), n=wordfreqs)
@@ -232,14 +214,14 @@ docfreqs %>%
 ```
 
 ```{r ratio dfs, include=FALSE}
-tf_idf_table <- merge(docfreqs, counts_clean)
+tf_idf_table <- merge(docfreqs, wordfreqs)
 
 tf_idf_table$tf_idf <- tf_idf_table$n/tf_idf_table$n_docs
 
 tf_idf_table<-tf_idf_table[order(-tf_idf_table$tf_idf),]
 ```
 
-I think it's these words because it's a ratio, I don't really get the point here might look tomorrow.
+I think it's these words because it's a ratio. Should we divide termfreq/docfreq or  docfreq/termfreq.
 ```{r TF-IDF plot,echo=FALSE}
 tf_idf_table %>%
   mutate(word = reorder(word,tf_idf)) %>% 
@@ -264,7 +246,7 @@ both_un_happy<-both_un_happy[order(-both_un_happy$ratio),]
 ```{r plot unhappy happy ratio, echo=FALSE}
 both_un_happy %>%
   mutate(word = reorder(word,ratio)) %>% 
-  top_n(20, ratio) %>%
+  top_n(10, ratio) %>%
   ggplot(aes(word,ratio)) +  
   geom_col() + 
   labs(x = NULL, y = "ratio") + 
@@ -274,7 +256,7 @@ both_un_happy %>%
 
 both_un_happy %>%
   mutate(word = reorder(word,-ratio)) %>% 
-  top_n(-14, ratio) %>%
+  top_n(-10, ratio) %>%
   ggplot(aes(word,ratio)) +  
   geom_col() + 
   labs(x = NULL, y = "ratio") + 
@@ -286,33 +268,34 @@ both_un_happy %>%
 ```{r setup and comparisionclouds,echo=FALSE}
 reviews_df$happy <- "happy"
 reviews_df[reviews_df$Rating <3,]$happy <- "unhappy"
-compare_matrix_binary <- reviews_df %>% unnest_tokens(word,Review) %>%count(word,happy,sort=TRUE) %>%ungroup()%>%cast_tdm(word,happy,n)
-compare_matrix_rating <- reviews_df %>% unnest_tokens(word,Review) %>%count(word,Rating,sort=TRUE) %>%ungroup()%>%cast_tdm(word,Rating,n)
+compare_matrix_binary <- reviews_df %>% unnest_tokens(word,Review_stem) %>%count(word,happy,sort=TRUE) %>%ungroup()%>%cast_tdm(word,happy,n)
+compare_matrix_rating <- reviews_df %>% unnest_tokens(word,Review_stem) %>%count(word,Rating,sort=TRUE) %>%ungroup()%>%cast_tdm(word,Rating,n)
 
 comparison.cloud(as.matrix(compare_matrix_binary), scale=c(3,0.5), random.order=FALSE, colors = c("indianred3","lightsteelblue3"),
  max.words=30, rot.per = 0.3)
 
-comparison.cloud(as.matrix(compare_matrix_rating), scale=c(3,0.5), random.order=FALSE, colors = c("lightblue", "pink", "yellow", "lightgreen", "grey"), 
+comparison.cloud(as.matrix(compare_matrix_rating), scale=c(3,0.5), random.order=FALSE, colors = c("lightblue", "pink", "orange", "lightgreen", "grey"), 
  max.words=30, rot.per = 0.3)
 ```
 
+## commonality cloud
 
+So these two plots are similar but that makes sense since, it's about words that are used by all ratings commenly.
 ```{r rcommonality cloud, echo= false}
 commonality.cloud(as.matrix(compare_matrix_binary), scale=c(3,0.5), random.order=FALSE, colors=brewer.pal(8, "Dark2"),
                   max.words=30, rot.per = 0.3)
 commonality.cloud(as.matrix(compare_matrix_rating), scale=c(3,0.5), random.order=FALSE, colors=brewer.pal(8, "Dark2"),
                   max.words=30, rot.per = 0.3)
-
 ```
-
+# MDS
 ```{r filter infrequent words, message=FALSE, warning=FALSE, include=FALSE}
 #can use this maybe I think this is correct?
-infrequent <- counts_clean %>% filter(n<0.01*nrow(counts_clean))
-frequent <- counts_clean %>% filter(n>0.01*nrow(counts_clean))
+infrequent <- counts %>% filter(n<0.01*nrow(counts))
+frequent <- counts %>% filter(n>0.01*nrow(counts))
 toremove <- infrequent
 
 for (j in 1:nrow(reviews_df)) {
- stemmed_Review<-  anti_join((reviews_df[j,] %>% unnest_tokens(word,Review,to_lower=TRUE) ),toremove)
+ stemmed_Review<-  anti_join((reviews_df[j,] %>% unnest_tokens(word,Review_stem,to_lower=TRUE) ),toremove)
   
  reviews_df[j,"Review_after_infreq"]<-   paste((stemmed_Review[,"word"]),collapse = " ")
 
@@ -320,7 +303,7 @@ for (j in 1:nrow(reviews_df)) {
 ```
 ## MDS document
 ```{r MDS document,echo=FALSE, message=FALSE, warning=FALSE}
-reviews_corp <- corpus(reviews_df, docid_field = "X", text_field = "Review")
+reviews_corp <- corpus(reviews_df, docid_field = "X", text_field = "Review_after_infreq")
 
 # feature cooccurrence matrix : fcm()
 co_occurrence_matrix <- fcm(x = reviews_corp, context = "document", count = "frequency", tri=FALSE)
@@ -376,7 +359,7 @@ ggplot(as.data.frame(MDS_map$conf), aes(D1, D2, label = rownames(MDS_map$conf)))
 # the conf element in the MDS output contains the coordinatis with as names D1 and D2.
 ```
 
-```{r PCA, echo=FALSE}
+```{r PCA, echo=FALSE, message=FALSE, warning=FALSE}
 review_tdm <- reviews_df %>% unnest_tokens(word,Review_after_infreq) %>%count(word,X,sort=TRUE) %>%ungroup()%>%cast_tdm(word,X,n)
 
 counts <- rowSums(as.matrix(review_tdm)) 
@@ -385,16 +368,16 @@ nwords<-200
 sortednames <- names(sortedcount[1:nwords])
 pca_results <- prcomp(t(review_tdm), scale = FALSE, rank. = 50) # why do we set scale to FALSE? -> All data is measured on the same scale 
 pca_results_backup <- pca_results  # create a backup of results for later use
-fviz_screeplot(pca_results,ncp=30)
+fviz_screeplot(pca_results,ncp=50)
 
 ```
 
 ```{r}
-ncomp<-6
+ncomp<-8
 pca_results_backup -> pca_results #restore original to play with number of components and rotations
 ```
-
-```{r}
+Top words per component
+```{r top words per component}
 #select the most important words per dimension
 
 j<-1
@@ -410,7 +393,7 @@ topwords
 ```
 
 ```{r warning = FALSE}
-axeslist <- c(1, 2)
+axeslist <- c(3, 4)
 fviz_pca_var(pca_results, axes=axeslist 
              ,geom.var = c("arrow", "text")
               ,col.var = "contrib", # Color by contributions to the PC
@@ -419,78 +402,96 @@ fviz_pca_var(pca_results, axes=axeslist
              )
 
 ```
+Still need vis for PCA and also might need to look at this a bit more.
 
-```{r}
+# sentiment analysis
 
-rawLoadings     <- pca_results$rotation[sortednames,1:ncomp] %*% diag(pca_results$sdev, ncomp, ncomp)
-rotated <- varimax(rawLoadings)
-pca_results$rotation <- rotated$loadings
-pca_results$x <- scale(pca_results$x[,1:ncomp]) %*% rotated$rotmat
+## plot freqeuent positive and negative words
+```{r plot freqeuent positive and negative words}
+# Remove stop words and count frequencies (only keep those with frequency above 50)
+all_words <- reviews_df[,] %>%
+             unnest_tokens("Review", output = "word") %>%
+             anti_join(stop_words, by = "word") %>%
+             count(word, sort = TRUE) %>%
+             filter(n>50)
 
+# get sentiment with bing dictionary:
+# all_words$sentiment <- get_sentiment(all_words$word, method = "bing", language = "english") 
 
-print("PCA finished")
+sentiment_scores <- polarity(all_words$word)$all        # get sentiment with polarity function
+all_words$sentiment <- sentiment_scores[,"polarity"]
 
+# Create plot
+all_words %>%
+  filter(n > 250) %>%
+  filter(sentiment != 0) %>%
+  mutate(n = ifelse(sentiment == -1, -n, n)) %>%
+  mutate(word = reorder(word, n)) %>%
+  mutate(Sentiment = ifelse(sentiment == 1, "Postive","Negative")) %>%
+  ggplot(aes(word, n, fill = Sentiment)) +
+  geom_col() +
+  coord_flip() +
+  labs(y = "Contribution to \"total\" sentiment", x = "Word (min freq = 50)")
 ```
 
-
-
-
-```{r sentiment score}
-pol <- polarity(reviews_df[, "text_full"])$all
+```{r create sentiment per review different methods, echo=FALSE}
+pol <- polarity(reviews_df[, "Review"])$all
 reviews_df$polarity <- pol[, "polarity"]
-reviews_df$sent_bing  <- get_sentiment(reviews_df$text_full, method = "bing")
+reviews_df$sent_bing  <- get_sentiment(reviews_df$Review, method = "bing")
+
+# Some alternatives
+#reviews_df$sent_syu  <- get_sentiment(reviews_df$Description, method = "syuzhet")
+#reviews_df$sent_afinn<- get_sentiment(reviews_df$Description, method = "afinn")
+#reviews_df$sent_nrc  <- get_sentiment(reviews_df$Description, method = "nrc")
 
 ```
 
 
-```{r}
-pos_reviews      <- reviews_df %>% filter(happy == "happy")
-neg_reviews      <- reviews_df %>% filter(happy == "unhappy")
+```{r polarity and bing of pos and neg, echo=FALSE}
+pos_reviews      <- reviews_df %>% filter(Rating > 3)
+neg_reviews      <- reviews_df %>% filter(Rating < 4)
 
 for (v in c("sent_bing","polarity"))
 {
   cat(v)
   cat(" ", mean(neg_reviews[, v]), " ", mean(pos_reviews[, v]), "\n")
 }
-
 ```
 
+## plot polarity and bing
+```{r plot polarity and bing, echo=FALSE}
 
-Histograms of sentiment, split on Happy/Unhappy on plain counting
-```{r}
-ggplot( ,aes(sent_bing)) +
+ggplot(reviews_df ,aes(sent_bing)) +
     geom_histogram(aes(fill = "Happy"),   data = pos_reviews, alpha = 0.5) +
     geom_histogram(aes(fill = "Unhappy"), data = neg_reviews, alpha = 0.5) +
     scale_colour_manual("Evaluation", values = c("green", "red"), aesthetics = "fill")
 
-ggplot( ,aes(sent_bing)) +
+ggplot(reviews_df,aes(sent_bing)) +
     geom_density(aes(fill = "Happy"),   data = pos_reviews, alpha = 0.5) +
     geom_density(aes(fill = "Unhappy"), data = neg_reviews, alpha = 0.5) +
     scale_colour_manual("Evaluation", values = c("green", "red"), aesthetics = "fill")
-```
 
-Histograms of sentiment split on Happy/Unhappy on polarity
-```{r}
-ggplot( ,aes(polarity)) +
+ggplot(reviews_df ,aes(polarity)) +
     geom_histogram(aes(fill = "Happy"),   data = pos_reviews, alpha = 0.5) +
     geom_histogram(aes(fill = "Unhappy"), data = neg_reviews, alpha = 0.5) +
-    scale_colour_manual("Polarity", values = c("green", "red"), aesthetics = "fill")
+    scale_colour_manual("Evaluation", values = c("green", "red"), aesthetics = "fill")
 
-ggplot( ,aes(polarity)) +
+ggplot(reviews_df,aes(polarity)) +
     geom_density(aes(fill = "Happy"),   data = pos_reviews, alpha = 0.5) +
     geom_density(aes(fill = "Unhappy"), data = neg_reviews, alpha = 0.5) +
-    scale_colour_manual("Polarity", values = c("green", "red"), aesthetics = "fill")
+    scale_colour_manual("Evaluation", values = c("green", "red"), aesthetics = "fill")
+
+
 ```
 
-
-Word frequencies in neg/pos reviews using polarity
-```{r}
+## plot polarity pos/neg words
+```{r Word frequencies in neg/pos reviews using polarity}
 # select negative reviews
 all_neg_review_words <- reviews_df  %>% filter(reviews_df$polarity<0)
 
 # get corresponding words (remove stop words)
 all_neg_review_words <- all_neg_review_words %>%
-                        unnest_tokens(word, text_full) %>%
+                        unnest_tokens(word, Review) %>%
                         anti_join(stop_words, by = "word")
 
 # create plot
@@ -504,13 +505,11 @@ all_neg_review_words%>%
             coord_flip() +
             theme(text = element_text(size = 17)) +
             ggtitle("Word Frequencies: negatively classified reviews")
-```
-Same for positive sentiment reviews
-```{r}
+
 all_pos_review_words <- reviews_df  %>% filter(reviews_df$polarity>0)
 
 all_pos_review_words <- (all_pos_review_words) %>% 
-                        unnest_tokens(word,text_full) %>% 
+                        unnest_tokens(word, Review) %>% 
                         anti_join(stop_words, by = "word")
 
 all_pos_review_words%>%
@@ -523,4 +522,74 @@ all_pos_review_words%>%
             coord_flip() +
             theme(text = element_text(size = 17)) +
             ggtitle("Word Frequencies: positively classified reviews")
+
 ```
+
+## sentiment analysis: number of positive sentences - number of negative sentences
+
+(this code generates some warnings on 'double punctuation')
+```{r, warning=FALSE}
+# This needs to be done by review as it decomposes into sentences
+
+# Allocate space for new variables
+reviews_df <- cbind(reviews_df, sentence_sent_polarity = 0*cbind(1:nrow(reviews_df)),
+                                sentence_sent_syu      = 0*cbind(1:nrow(reviews_df)),
+                                sentence_sent_afinn    = 0*cbind(1:nrow(reviews_df)),
+                                sentence_sent_bing     = 0*cbind(1:nrow(reviews_df)),
+                                sentence_sent_nrc      = 0*cbind(1:nrow(reviews_df)))
+
+totalNoSentences = 0
+for (j in 1:nrow(reviews_df)) {
+  # print progress
+  if (j%%1000==0){
+    print(100*j/nrow(reviews_df))
+  }
+  localSentences <- get_sentences(reviews_df[j,]$Review)
+  totalNoSentences = totalNoSentences + length(localSentences)
+  
+  reviews_df[j,]$sentence_sent_polarity <- polarity(localSentences)$all[,"polarity"] %>% 
+                                            sign() %>% sum()
+  
+  #reviews_df[j,]$sentence_sent_syu <-
+  #    get_sentiment(localSentences, method = "syuzhet", language = "english") %>% sign()  %>% sum()
+
+  #reviews_df[j,]$sentence_sent_afinn <-
+  #  get_sentiment(localSentences, method = "afinn", language = "english") %>% sign()  %>% sum()
+
+  reviews_df[j,]$sentence_sent_bing <-
+    get_sentiment(localSentences, method = "bing", language = "english") %>% sign()  %>% sum()
+
+  #reviews_df[j,]$sentence_sent_nrc <-
+  #  get_sentiment(localSentences, method = "nrc", language = "english") %>% sign()  %>% sum()
+}
+```
+
+```{r}
+all_sentences <- data.frame(sentence    = rep(0, totalNoSentences),
+                            sentiment   = rep(0, totalNoSentences),
+                            polarity    = rep(0, totalNoSentences),
+                            User_ID     = rep(reviews_df[1,"X"],     totalNoSentences),
+                            Rating = rep(reviews_df[1,"Rating_b"], totalNoSentences), 
+                            stringsAsFactors = FALSE)
+#totalNoSentences <- 116396 # this was the number after the previous step
+sentenceIndex = 1
+for (j in 1:nrow(reviews_df)) {
+  # show some progress 
+  if (j%%2000==0){
+    print(100*j/nrow(reviews_df))
+  }
+  
+  localSentences <- reviews_df[j,]$Review %>% get_sentences()
+  
+  all_sentences[sentenceIndex : (sentenceIndex+length(localSentences)-1), "sentence"] <- localSentences
+
+  all_sentences[sentenceIndex : (sentenceIndex+length(localSentences)-1), "sentiment"] <- get_sentiment(localSentences, method = "bing")
+  all_sentences[sentenceIndex : (sentenceIndex+length(localSentences)-1), "polarity"] <- polarity(localSentences)$all[,"polarity"]
+
+  all_sentences[sentenceIndex : (sentenceIndex+length(localSentences)-1), "User_ID"]  <- reviews_df[j,]$X
+  all_sentences[sentenceIndex : (sentenceIndex+length(localSentences)-1), "Rating"] <- reviews_df[j,]$Rating_b
+
+  sentenceIndex = sentenceIndex + length(localSentences)
+}
+```
+
