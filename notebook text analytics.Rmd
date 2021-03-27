@@ -489,3 +489,73 @@ for (v in c("sent_bing","polarity"))
 }
 
 ```
+
+
+Histograms of sentiment, split on Happy/Unhappy on plain counting
+```{r}
+ggplot( ,aes(sent_bing)) +
+    geom_histogram(aes(fill = "Happy"),   data = pos_reviews, alpha = 0.5) +
+    geom_histogram(aes(fill = "Unhappy"), data = neg_reviews, alpha = 0.5) +
+    scale_colour_manual("Evaluation", values = c("green", "red"), aesthetics = "fill")
+
+ggplot( ,aes(sent_bing)) +
+    geom_density(aes(fill = "Happy"),   data = pos_reviews, alpha = 0.5) +
+    geom_density(aes(fill = "Unhappy"), data = neg_reviews, alpha = 0.5) +
+    scale_colour_manual("Evaluation", values = c("green", "red"), aesthetics = "fill")
+```
+
+Histograms of sentiment split on Happy/Unhappy on polarity
+```{r}
+ggplot( ,aes(polarity)) +
+    geom_histogram(aes(fill = "Happy"),   data = pos_reviews, alpha = 0.5) +
+    geom_histogram(aes(fill = "Unhappy"), data = neg_reviews, alpha = 0.5) +
+    scale_colour_manual("Polarity", values = c("green", "red"), aesthetics = "fill")
+
+ggplot( ,aes(polarity)) +
+    geom_density(aes(fill = "Happy"),   data = pos_reviews, alpha = 0.5) +
+    geom_density(aes(fill = "Unhappy"), data = neg_reviews, alpha = 0.5) +
+    scale_colour_manual("Polarity", values = c("green", "red"), aesthetics = "fill")
+```
+
+
+Word frequencies in neg/pos reviews using polarity
+```{r}
+# select negative reviews
+all_neg_review_words <- reviews_df  %>% filter(reviews_df$polarity<0)
+
+# get corresponding words (remove stop words)
+all_neg_review_words <- all_neg_review_words %>%
+                        unnest_tokens(word, text_full) %>%
+                        anti_join(stop_words, by = "word")
+
+# create plot
+all_neg_review_words%>%
+            count(word, sort=TRUE) %>%
+            mutate(word = reorder(word,n)) %>%
+            top_n(25, word) %>%
+            ggplot(aes(word,n)) +  
+            geom_col() +
+            labs(x = NULL, y = "Number of occurences") +
+            coord_flip() +
+            theme(text = element_text(size = 17)) +
+            ggtitle("Word Frequencies: negatively classified reviews")
+```
+Same for positive sentiment reviews
+```{r}
+all_pos_review_words <- reviews_df  %>% filter(reviews_df$polarity>0)
+
+all_pos_review_words <- (all_pos_review_words) %>% 
+                        unnest_tokens(word,text_full) %>% 
+                        anti_join(stop_words, by = "word")
+
+all_pos_review_words%>%
+            count(word, sort=TRUE) %>%
+            mutate(word = reorder(word,n)) %>%
+            top_n(25, word) %>%
+            ggplot(aes(word,n)) +  
+            geom_col() +
+            labs(x = NULL, y = "Number of occurences") +
+            coord_flip() +
+            theme(text = element_text(size = 17)) +
+            ggtitle("Word Frequencies: positively classified reviews")
+```
