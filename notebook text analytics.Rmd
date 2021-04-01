@@ -29,6 +29,14 @@ library(quanteda)
 library(factoextra)
 #lecture 3
 library(syuzhet)
+library(RDRPOSTagger)
+library(data.table)
+#lecture4
+library(gtools)
+library(combinat)
+library(NMF)
+library(tidyr)
+
 # maybe needed
 # options(stringsAsFactors = FALSE)
 
@@ -592,4 +600,218 @@ for (j in 1:nrow(reviews_df)) {
   sentenceIndex = sentenceIndex + length(localSentences)
 }
 ```
+split positve negatve sentences
+```{r include=FALSE}
+all_pos_sentences <- all_sentences %>% filter(polarity>0)
+all_neg_sentences <- all_sentences %>% filter(polarity<0)
+```
+
+## Remove stop words and look at words that occur often in pos or neg sentences
+```{r echo=FALSE}
+all_neg_sentences_words <- all_neg_sentences  %>%
+                           unnest_tokens(word, sentence) %>%
+                           anti_join(stop_words, by = "word")
+
+all_neg_sentences_words %>%
+            count(word, sort=TRUE) %>%
+            mutate(word = reorder(word,n)) %>%
+            top_n(25, word) %>%
+            ggplot(aes(word,n)) +  
+            geom_col() +
+            labs(x = NULL, y = "Number of occurences") +
+            coord_flip() +
+            theme(text = element_text(size = 17)) +
+            ggtitle("Word Frequency Histogram (negative sentences)")
+```
+
+## Same for positive sentences
+```{r echo=FALSE}
+all_pos_sentences_words<- all_pos_sentences  %>%
+                          unnest_tokens(word,sentence) %>%
+                          anti_join(stop_words, by = "word")
+
+all_pos_sentences_words %>%
+            count(word, sort=TRUE) %>%
+            mutate(word = reorder(word,n)) %>%
+            top_n(25, word) %>%
+            ggplot(aes(word,n)) +  
+            geom_col() +
+            labs(x = NULL, y = "Number of occurences") +
+            coord_flip() +
+            theme(text = element_text(size = 17)) +
+            ggtitle("Word Frequency Histogram (positive sentences)")
+```
+
+
+## Look at difference of frequency of words in positive vs negative sentences
+```{r echo=FALSE}
+# Get counts of words in pos (and neg) sentences
+all_sentence_words <- full_join(all_pos_sentences_words %>% count(word, sort=TRUE),
+                              all_neg_sentences_words %>% count(word, sort=TRUE),
+                              by="word")
+all_sentence_words[is.na(all_sentence_words$n.x), "n.x"] <- 0
+all_sentence_words[is.na(all_sentence_words$n.y), "n.y"] <- 0
+
+# Normalize counts by total number of words in each group and calculate ratio
+all_sentence_words$n.x  <- all_sentence_words$n.x/sum(all_sentence_words$n.x)
+all_sentence_words$n.y  <- all_sentence_words$n.y/sum(all_sentence_words$n.y)
+all_sentence_words$diff <- all_sentence_words$n.x-all_sentence_words$n.y
+
+all_sentence_words%>%
+            mutate(word = reorder(word, -diff)) %>%           
+            top_n(-20, diff) %>%
+            ggplot(aes(word,diff)) +  
+            geom_col() +
+            labs(x = NULL, y = "Difference in word frequency (pos-neg)") +
+            coord_flip() +
+            theme(text = element_text(size = 17)) +
+            ggtitle("Specific negative words")
+
+all_sentence_words%>%
+            mutate(word = reorder(word,diff)) %>%           
+            top_n(20, diff) %>%
+            ggplot(aes(word,diff)) +  
+            geom_col() +
+            labs(x = NULL, y = "Difference in word frequency (pos-neg)") +
+            coord_flip() +
+            theme(text = element_text(size = 17)) +
+            ggtitle("Specific positive words")
+```
+
+## RDRPOSTagger
+```{r include=FALSE}
+POS_specs <- rdr_model(language = "English", annotation =  "POS")
+```
+
+Identify all nouns and save them in a file (in data.frame is very slow, file is also slow (but a bit less so))
+```{r message=FALSE, warning=FALSE, include=FALSE}
+#Write header of file
+outFile <- file("nouns", open="w")
+write("doc_id,token_id,token,pos,Is_Response,sentiment", outFile);
+close(outFile)
+###########################################################names(all_sentences)[names(all_sentences) == "Rating"] <- "Is_Response"
+# Process all sentences (POS tagger is really specific on bad sentences, 
+# so we do additional pre-processing)
+startIndex = 1
+for (j in startIndex:nrow(all_sentences)) {
+    if (j%%1000==0){
+      print(100*j/nrow(all_sentences))
+    }
+    to_analyse <-  all_sentences[j,"sentence"]  %>% 
+                   {gsub("(^ *[,\\.)]+)+","",.)} %>%  # remove leading , or . or ) (also repetitions)
+                   {gsub("(\\(|\\))"," ", .)}         # remove ( and )
+    to_analyse <-  to_analyse  %>% gsub("  +"," ", .) # remove double spaces
+
+    if(nchar(to_analyse)>1) {
+
+      sentence_nouns <- tryCatch(
+        rdr_pos(POS_specs, to_analyse,  doc_id = all_sentences[j,"User_ID"]),
+                           error = function(e) 
+                             print(cat(" POS fails on: ", to_analyse, " sentence: ", j ))
+                                )
+      if (!is.null(sentence_nouns))
+      {
+        sentence_nouns <- sentence_nouns %>% filter(pos == "NN")
+        if (nrow(sentence_nouns)>0)
+        {
+          sentences_nouns <- data.frame(sentence_nouns, Is_Response = all_sentences[j,"Is_Response"],
+                                       sentiment =  all_sentences[j,"sentiment"])
+          fwrite(sentences_nouns, file="nouns", append=TRUE)
+        }
+      }
+    }
+}
+```
+
+
+Read all nouns from created file. Had to manually make this a `csv` file might as well just wrote as `.csv` in the loop.
+```{r message=FALSE, warning=FALSE, include=FALSE}
+all_sentences_nouns <- read_csv("nouns.csv")
+all_sentences_nouns$token <- as.character(all_sentences_nouns$token)
+```
+
+## Plot frequencies of nouns in neg sentences and pos
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+all_neg_sentences_nouns <- all_sentences_nouns %>%
+                           filter(all_sentences_nouns$sentiment<0) %>%
+                           unnest_tokens(word,token) %>%
+                           anti_join(stop_words, by = "word")
+
+all_pos_sentences_nouns <- all_sentences_nouns %>%
+                           filter(all_sentences_nouns$sentiment>0) %>%
+                           unnest_tokens(word,token) %>%
+                           anti_join(stop_words, by = "word")
+
+all_neg_sentences_nouns %>%
+            count(word, sort=TRUE) %>%
+            mutate(word = reorder(word,n)) %>%
+            top_n(20, word) %>%
+            ggplot(aes(word,n)) +  
+            geom_col() +
+            labs(x = NULL, y = "Number of occurrences") +
+            coord_flip() +
+            theme(text = element_text(size = 17)) +
+            ggtitle("Nouns Frequency Histogram (negative sentences)")
+
+all_pos_sentences_nouns %>%
+            count(word, sort=TRUE) %>%
+            mutate(word = reorder(word,n)) %>%
+            top_n(20, word) %>%
+            ggplot(aes(word,n)) +  
+            geom_col() +
+            labs(x = NULL, y = "Number of occurences") +
+            coord_flip() +
+            theme(text = element_text(size = 17)) +
+            ggtitle("Nouns Frequency Histogram (positive sentences)")
+```
+
+Comparison clouds
+```{r message=FALSE, warning=FALSE, include=FALSE}
+avgsentiment_nouns <-
+  group_by(all_sentences_nouns, token) %>%
+  summarize(m = mean(sentiment), count = n()) %>%
+  arrange(desc(abs(m)))
+avgsentiment_nouns
+```
+
+Create actual comparison cloud
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+avgsentiment_nouns$Positive_nouns <-  avgsentiment_nouns$count*(avgsentiment_nouns$m > 0)
+avgsentiment_nouns$Negative_nouns <-  avgsentiment_nouns$count*(avgsentiment_nouns$m < -0)
+
+avgsentiment_nouns <- as.data.frame(avgsentiment_nouns)
+rownames(avgsentiment_nouns) <-  avgsentiment_nouns$token
+
+comparison.cloud(avgsentiment_nouns[,c("Positive_nouns","Negative_nouns")], 
+                 scale=c(4, 0.5), max.words=100, title.size=1)
+```
+
+
+## Score each word on emotion.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+tmp <- all_sentences_nouns %>% group_by(token) %>% summarise(cnt=n())  
+emotion <- get_nrc_sentiment(tmp$token)
+rownames(emotion) <- tmp$token
+emotion <- emotion*tmp$cnt
+comparison.cloud(emotion[,c("anger","fear","disgust","anticipation","joy","sadness","surprise","trust")],
+                 scale=c(3, 0.6), title.size=1)
+```
+
+# Topic modeling
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
