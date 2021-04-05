@@ -25,6 +25,7 @@ library(ggfortify)
 library(ggthemes)
 library(stats)
 library(quanteda)
+library(magrittr)
 #mds pcs
 library(factoextra)
 #lecture 3
@@ -93,7 +94,7 @@ reviews_df$Review <- as.character(reviews_df$text_full)  %>%
 review_words <- reviews_df %>% unnest_tokens(word,Review,to_lower=TRUE) 
 review_words <- review_words %>% 
                         anti_join(stop_words)
-counts <- review_words_nostop %>%
+counts <- review_words %>%
             count(word, sort=TRUE)
 counts %>% 
   mutate(word = reorder(word,n)) %>% 
@@ -353,7 +354,7 @@ ggplot(as.data.frame(MDS_map$conf), aes(D1, D2, label = rownames(MDS_map$conf)))
 ```
 ## MDS window = 5
 ```{r MDS window is  5, echo=FALSE}
-co_occurrence_matrix <- fcm(x = reviews_corp, context = "window", window=5, count = "boolean", tri=FALSE)
+co_occurrence_matrix <- fcm(x = reviews_corp, context = "window", window=8, count = "boolean", tri=FALSE)
 
 co_occurrence_matrix<-co_occurrence_matrix[sortednames[1:nwords],sortednames[1:nwords]]
 
@@ -376,7 +377,7 @@ nwords<-200
 sortednames <- names(sortedcount[1:nwords])
 pca_results <- prcomp(t(review_tdm), scale = FALSE, rank. = 50) # why do we set scale to FALSE? -> All data is measured on the same scale 
 pca_results_backup <- pca_results  # create a backup of results for later use
-fviz_screeplot(pca_results,ncp=50)
+fviz_screeplot(pca_results,ncp=20)
 
 ```
 
@@ -401,7 +402,7 @@ topwords
 ```
 
 ```{r warning = FALSE}
-axeslist <- c(3, 4)
+axeslist <- c(1, 8)
 fviz_pca_var(pca_results, axes=axeslist 
              ,geom.var = c("arrow", "text")
               ,col.var = "contrib", # Color by contributions to the PC
