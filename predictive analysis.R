@@ -226,3 +226,105 @@ reviews_df <- data.frame(reviews_df, nrc_emotions)
 review_dtm_bi <- as.matrix(review_dtm_bi)
 reviews_df <- cbind(reviews_df, review_dtm_bi[match(rownames(reviews_df), rownames(review_dtm_bi)),])
 reviews_df[is.na(reviews_df)] <- 0
+
+names(reviews_df) <- gsub(" ", "_", names(reviews_df), fixed = TRUE)
+
+
+
+
+
+# preparation of the predictive features ---- 
+N_factors <- 20
+N_emotions <- 10 # includes pos/neg
+N_words_stored <- 50
+N_bigrams_stored <- 71
+
+index <- 7
+factornames  <- colnames(reviews_df)[index:(index+N_factors-1)]
+index <- index + N_factors
+wordnames    <- colnames(reviews_df)[index:(index+N_words_stored-1)]
+index <- index + N_words_stored
+emotionnames <- colnames(reviews_df)[index:(index+N_emotions-1)]
+index <- index + N_emotions
+bigramnames <- colnames(reviews_df)[index:(index+N_bigrams_stored-1)]
+index <- index + N_bigrams_stored
+
+set.seed(1234)    # fix seed to allow for results to be reproducible
+estimation_sample <- sort(sample(1:nrow(reviews_df), size = round(0.7*nrow(reviews_df))))
+test_sample <- (1:nrow(reviews_df))[-estimation_sample]
+
+# Prepare some strings for efficient use in model definitions
+
+allFactors <- paste("(", paste(factornames,collapse=" + "), ")")
+allEmotions <- paste("(", paste(emotionnames,collapse=" + "), ")")
+allWords <- paste("(", paste(wordnames,collapse=" + "), ")")
+allBigrams <- paste("(", paste(bigramnames,collapse=" + "), ")")
+allWordsAndBigrams <- paste("(", paste(c(wordnames, bigramnames),collapse=" + "), ")")
+# show example
+allFactors
+
+
+# Basic linear model (without interactions and variable selection) ---- 
+
+f <- paste("rating ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
+lm.all <- lm(f, data=reviews_df[estimation_sample,] )
+summary(lm.all)
+
+f <- paste("rating ~ Nr_of_words + ", allFactors, " + ", allWords , " + ", allBigrams)
+lm.nodict <- lm(f, data=reviews_df[estimation_sample,] )
+summary(lm.nodict)
+
+f <- paste("rating ~  Nr_of_words + ", allFactors)
+lm.onlyfactors <- lm(f, data = reviews_df[estimation_sample, ])
+summary(lm.onlyfactors)
+
+f <- paste("rating ~  Nr_of_words + ", allEmotions)
+lm.onlyemotions <- lm(f, data = reviews_df[estimation_sample,])
+summary(lm.onlyemotions)
+
+f <- paste("rating ~ Nr_of_words + ", allWords)
+lm.onlywords <- lm(f, data = reviews_df[estimation_sample,])
+summary(lm.onlywords)
+
+f <- paste("rating ~ Nr_of_words + ", allBigrams)
+lm.bigrams <- lm(f, data = reviews_df[estimation_sample,])
+summary(lm.bigrams)
+
+
+f <- paste("rating ~ Nr_of_words + ", allWords , " + ",allBigrams)
+lm.words_bigrams <- lm(f, data = reviews_df[estimation_sample,])
+summary(lm.words_bigrams)
+
+f <- paste("rating ~ Nr_of_words + positive + negative")
+lm.posneg <- lm(f, data = reviews_df[estimation_sample,])
+summary(lm.posneg)
+
+
+# AIC comparison
+
+AIC(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg)
+
+# Test some nested models
+
+anova(lm.nodict, lm.all)
+anova(lm.posneg, lm.onlyemotions)
+anova(lm.words_bigrams, lm.all)
+
+# Plot prediction histograms
+library(ggplot2)
+dat <- data.frame(Prediction=predict(lm.all), rating=reviews_df[estimation_sample, "rating"])
+ggplot(dat, aes(x=Prediction))  + 
+  geom_histogram(data=subset(dat,rating == 1),fill = "red", alpha = 0.2) +
+  geom_histogram(data=subset(dat,rating == 2),fill = "blue", alpha = 0.2)
+
+
+
+# compare to GLM
+f <- paste("(rating==2) ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
+glm.all <- glm(f, data=reviews_df[estimation_sample,] , family=binomial)
+summary(glm.all)
+
+dat <- data.frame(Predicted_prob=predict(glm.all, type="response"), rating=reviews_df[estimation_sample, "rating"])
+ggplot(dat, aes(x=Predicted_prob))  + 
+  geom_histogram(data=subset(dat,rating == 1),fill = "red", alpha = 0.2) +
+  geom_histogram(data=subset(dat,rating == 2),fill = "blue", alpha = 0.2)
