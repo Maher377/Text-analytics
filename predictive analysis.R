@@ -304,6 +304,9 @@ summary(lm.posneg)
 
 AIC(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg)
 
+# model with only emotion features are the best model
+
+
 # Test some nested models
 
 anova(lm.nodict, lm.all)
@@ -312,19 +315,55 @@ anova(lm.words_bigrams, lm.all)
 
 # Plot prediction histograms
 library(ggplot2)
-dat <- data.frame(Prediction=predict(lm.all), rating=reviews_df[estimation_sample, "rating"])
+dat <- data.frame(Prediction=predict(lm.onlyemotions), rating=reviews_df[estimation_sample, "rating"])
 ggplot(dat, aes(x=Prediction))  + 
   geom_histogram(data=subset(dat,rating == 1),fill = "red", alpha = 0.2) +
   geom_histogram(data=subset(dat,rating == 2),fill = "blue", alpha = 0.2)
 
 
 
-# compare to GLM
-f <- paste("(rating==2) ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
-glm.all <- glm(f, data=reviews_df[estimation_sample,] , family=binomial)
-summary(glm.all)
+# compare to GLM (not suitable here cuz our output variable are numbers from 1 to 5)
+f <- paste("rating ~  Nr_of_words + ", allEmotions)
+glm.onlyemotions <- glm(f, data=reviews_df[estimation_sample,] , family=binomial)
+summary(glm.onlyemotions)
 
-dat <- data.frame(Predicted_prob=predict(glm.all, type="response"), rating=reviews_df[estimation_sample, "rating"])
+dat <- data.frame(Predicted_prob=predict(glm.onlyemotions, type="response"), rating=reviews_df[estimation_sample, "rating"])
 ggplot(dat, aes(x=Predicted_prob))  + 
   geom_histogram(data=subset(dat,rating == 1),fill = "red", alpha = 0.2) +
   geom_histogram(data=subset(dat,rating == 2),fill = "blue", alpha = 0.2)
+
+
+
+# Variable importance ----
+
+#Variable importance using t-values
+library(caret)
+vi <- varImp(lm.all)
+vi$Variable <- rownames(vi)
+vi <- vi[order(-vi$Overall),]
+vi$Variable <- factor(vi$Variable, levels = rev(vi$Variable))
+
+ggplot(vi[1:25, ], aes(Variable,Overall)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (t-value based)")
+
+ggplot(vi[(nrow(vi)-24):nrow(vi), ], aes(Variable,Overall)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (t-value based)")
+
+# Variable importance using standardized coefficients
+library("matrixStats")
+vi <- coef(lm.all)/sqrt(colVars(model.matrix(formula(lm.all), data=reviews_df[estimation_sample,])))
+StdCoef <- data.frame(StdCoef=vi[2:length(vi)])
+StdCoef$Variable <- rownames(StdCoef)
+StdCoef <- StdCoef[order(- StdCoef$StdCoef),]
+StdCoef$Variable <- factor( StdCoef$Variable, levels = rev( StdCoef$Variable))
+
+StdCoef <-  StdCoef[1:25,]
+ggplot( StdCoef, aes(Variable,StdCoef)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (standardized coefficients)")
+
+
+
+
+
+# backward selection ---- 
+
+f <- paste("rating ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
+lm.fe_step <- step(lm(f, data = reviews_df[estimation_sample,]), direction = "both")
+summary(lm.fe_step)
