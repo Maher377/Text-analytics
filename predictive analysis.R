@@ -150,7 +150,7 @@ for (j in 1:nrow(reviews_df))
 }
 
 head(reviews_df)
-reviews_df$stemmed_reviewtext <- 
+
 save(reviews_df, file="Saved_reviews_df.Rda")
 
 # Get document term matrix ---- 
@@ -266,6 +266,7 @@ allFactors
 
 # Basic linear model (without interactions and variable selection) ---- 
 
+# take rating as a dependent variable
 f <- paste("rating ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
 lm.all <- lm(f, data=reviews_df[estimation_sample,] )
 summary(lm.all)
@@ -299,12 +300,52 @@ f <- paste("rating ~ Nr_of_words + positive + negative")
 lm.posneg <- lm(f, data = reviews_df[estimation_sample,])
 summary(lm.posneg)
 
-
 # AIC comparison
 
-AIC(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg)
+AIC(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg, lm.optimal)
 
-# model with only emotion features are the best model
+# take happy or unhappy as the dependent variable
+reviews_df$Rating_b<- ifelse(reviews_df$Rating_b == "happy",1,0)
+  
+f <- paste("Rating_b ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
+lm.all <- lm(f, data=reviews_df[estimation_sample,] )
+summary(lm.all)
+
+f <- paste("Rating_b ~ Nr_of_words + ", allFactors, " + ", allWords , " + ", allBigrams)
+lm.nodict <- lm(f, data=reviews_df[estimation_sample,] )
+summary(lm.nodict)
+
+f <- paste("Rating_b ~  Nr_of_words + ", allFactors)
+lm.onlyfactors <- lm(f, data = reviews_df[estimation_sample, ])
+summary(lm.onlyfactors)
+
+f <- paste("Rating_b ~  Nr_of_words + ", allEmotions)
+lm.onlyemotions <- lm(f, data = reviews_df[estimation_sample,])
+summary(lm.onlyemotions)
+
+f <- paste("Rating_b ~ Nr_of_words + ", allWords)
+lm.onlywords <- lm(f, data = reviews_df[estimation_sample,])
+summary(lm.onlywords)
+
+f <- paste("Rating_b ~ Nr_of_words + ", allBigrams)
+lm.bigrams <- lm(f, data = reviews_df[estimation_sample,])
+summary(lm.bigrams)
+
+
+f <- paste("Rating_b ~ Nr_of_words + ", allWords , " + ",allBigrams)
+lm.words_bigrams <- lm(f, data = reviews_df[estimation_sample,])
+summary(lm.words_bigrams)
+
+f <- paste("Rating_b ~ Nr_of_words + positive + negative")
+lm.posneg <- lm(f, data = reviews_df[estimation_sample,])
+summary(lm.posneg)
+
+f <- Rating_b ~ Nr_of_words + factor1 + factor3 + factor6 + factor7 + factor8 + factor9 + factor10 + factor13 + factor16 + factor19 + fall + anticipation + disgust + joy + trust + factor20 + fit + size + wear + love + color + fabric + nice + flatter + jean + feel + style + purchas + line + positive + dress_dress + dress_wear + arm_hole + size_6 + dress_beauti + wear_size + super_cute + true_size + love_dress + fit_not + love_sweater + top_fit + skinni_jean + love_shirt + agre_review + bought
+lm.optimal <- lm(f, data = reviews_df[estimation_sample,])
+summary(lm.optimal)
+
+# AIC comparison
+AIC(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg, lm.optimal)
 
 
 # Test some nested models
@@ -323,11 +364,11 @@ ggplot(dat, aes(x=Prediction))  +
 
 
 # compare to GLM (not suitable here cuz our output variable are numbers from 1 to 5)
-f <- paste("rating ~  Nr_of_words + ", allEmotions)
-glm.onlyemotions <- glm(f, data=reviews_df[estimation_sample,] , family=binomial)
-summary(glm.onlyemotions)
+f <- Rating_b ~ Nr_of_words + factor1 + factor3 + factor6 + factor7 + factor8 + factor9 + factor10 + factor13 + factor16 + factor19 + fall + anticipation + disgust + joy + trust + factor20 + fit + size + wear + love + color + fabric + nice + flatter + jean + feel + style + purchas + line + positive + dress_dress + dress_wear + arm_hole + size_6 + dress_beauti + wear_size + super_cute + true_size + love_dress + fit_not + love_sweater + top_fit + skinni_jean + love_shirt + agre_review + bought
+glm.optimal <- glm(f, data=reviews_df[estimation_sample,] , family=binomial)
+summary(glm.optimal)
 
-dat <- data.frame(Predicted_prob=predict(glm.onlyemotions, type="response"), rating=reviews_df[estimation_sample, "rating"])
+dat <- data.frame(Predicted_prob=predict(glm.optimal, type="response"), rating=reviews_df[estimation_sample, "rating"])
 ggplot(dat, aes(x=Predicted_prob))  + 
   geom_histogram(data=subset(dat,rating == 1),fill = "red", alpha = 0.2) +
   geom_histogram(data=subset(dat,rating == 2),fill = "blue", alpha = 0.2)
@@ -367,3 +408,33 @@ ggplot( StdCoef, aes(Variable,StdCoef)) + geom_bar(stat = "identity") + coord_fl
 f <- paste("rating ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
 lm.fe_step <- step(lm(f, data = reviews_df[estimation_sample,]), direction = "both")
 summary(lm.fe_step)
+
+# Lasso regression ----
+
+library(glmnet)
+library(plotmo) # for plot_glmnet
+
+f = paste("~ 0 + Nr_of_words + ", allFactors, " * ", allEmotions, " + ", allWords, " + ", allBigrams)
+
+# Collect explanatory variables in a (large) matrix
+LargeX <- model.matrix(formula(f), data=reviews_df)
+y <- as.matrix(reviews_df[estimation_sample, "rating"])
+
+lasso.mod <- glmnet(LargeX[estimation_sample,], y, alpha = 1)
+
+plot_glmnet(lasso.mod) 
+plot(lasso.mod)
+
+cvfit <- cv.glmnet(LargeX[estimation_sample,], y, alpha = 1)
+plot(cvfit)
+
+coef(lasso.mod, cvfit$lambda.1se)
+
+par <- predict(lasso.mod, s = cvfit$lambda.min, type='coefficients')
+nnzero(par)
+par <- predict(lasso.mod, s = cvfit$lambda.1se, type='coefficients')
+nnzero(par)
+
+lasso.pred <- predict(lasso.mod, s = cvfit$lambda.1se, newx = LargeX[estimation_sample,])
+lasso.pred.test <- predict(lasso.mod, s = cvfit$lambda.1se, newx = LargeX[test_sample,])
+mean((reviews_df[test_sample, "rating"]-lasso.pred.test)^2)
