@@ -202,6 +202,7 @@ review_dtm_bi <- review_dtm_bi %>%
   cast_dtm(User_ID, bigram, n)
 ```
 
+
 ```{r}
 # Run PCA on DTM ----
 N_factors   <- 20
@@ -212,6 +213,8 @@ rotated     <- varimax(rawLoadings)
 pca_results$rotation <- rotated$loadings
 pca_results$x <- scale(pca_results$x[,1:N_factors]) %*% rotated$rotmat 
 ```
+
+pca_results$
 
 ```{r}
 # Add the factors to the data frame
@@ -246,6 +249,7 @@ nrc_emotions  <- get_nrc_sentiment(reviews_df$reviewtext)
 reviews_df <- data.frame(reviews_df, nrc_emotions)
 ```
 
+
 ```{r}
 # Add bigrams ----
 
@@ -256,6 +260,7 @@ reviews_df[is.na(reviews_df)] <- 0
 names(reviews_df) <- gsub(" ", "_", names(reviews_df), fixed = TRUE)
 
 ```
+
 
 ```{r}
 # preparation of the predictive features ---- 
@@ -329,13 +334,26 @@ f <- paste("rating ~ Nr_of_words + positive + negative")
 lm.posneg <- lm(f, data = reviews_df[estimation_sample,])
 summary(lm.posneg)
 
+f <- "rating ~ Nr_of_words + factor1 + factor3 + factor6 + 
+    factor7 + factor8 + factor9 + factor10 + factor13 + factor16 + 
+    factor19 + fall + anticipation + disgust + joy + trust + 
+    factor20 + fit + size + wear + love + color + fabric + nice + 
+    flatter + jean + feel + style + purchas + line + positive + 
+    dress_dress + dress_wear + arm_hole + size_6 + dress_beauti + 
+    wear_size + super_cute + true_size + love_dress + fit_not + 
+    love_sweater + top_fit + skinni_jean + love_shirt + agre_review + 
+    bought"
+lm.optimal <- lm(f, data = reviews_df[estimation_sample,])
+summary(lm.optimal)
+
 ```
+
 
 ```{r}
 
 # AIC comparison
 
-AIC(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg)
+AIC(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg, lm.fe_step)
 ```
 
 
@@ -357,17 +375,6 @@ ggplot(dat, aes(x=Prediction))  +
   geom_histogram(data=subset(dat,rating == 2),fill = "blue", alpha = 0.2)
 ```
 
-```{r}
-# compare to GLM
-f <- paste("(rating==2) ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
-glm.all <- glm(f, data=reviews_df[estimation_sample,] , family=binomial)
-summary(glm.all)
-
-dat <- data.frame(Predicted_prob=predict(glm.all, type="response"), rating=reviews_df[estimation_sample, "rating"])
-ggplot(dat, aes(x=Predicted_prob))  + 
-  geom_histogram(data=subset(dat,rating == 1),fill = "red", alpha = 0.2) +
-  geom_histogram(data=subset(dat,rating == 2),fill = "blue", alpha = 0.2)
-```
 
 ```{r}
 #Predictive performance
@@ -384,15 +391,52 @@ for (m in list(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords,
 print("lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg")
 ```
 
+```{r}
+#Variable importance using t-values
+library(caret)
+vi <- varImp(lm.all)
+vi$Variable <- rownames(vi)
+vi <- vi[order(-vi$Overall),]
+vi$Variable <- factor(vi$Variable, levels = rev(vi$Variable))
+
+ggplot(vi[1:25, ], aes(Variable,Overall)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (t-value based)")
+
+ggplot(vi[(nrow(vi)-24):nrow(vi), ], aes(Variable,Overall)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (t-value based)")
+
+# Variable importance using standardized coefficients
+library("matrixStats")
+vi <- coef(lm.all)/sqrt(colVars(model.matrix(formula(lm.all), data=reviews_df[estimation_sample,])))
+StdCoef <- data.frame(StdCoef=vi[2:length(vi)])
+StdCoef$Variable <- rownames(StdCoef)
+StdCoef <- StdCoef[order(- StdCoef$StdCoef),]
+StdCoef$Variable <- factor( StdCoef$Variable, levels = rev( StdCoef$Variable))
+
+StdCoef <-  StdCoef[1:25,]
+ggplot( StdCoef, aes(Variable,StdCoef)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (standardized coefficients)")
+```
+
+```{r}
+#backward selection
+f <- paste("rating ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
+lm.fe_step <- step(lm(f, data = reviews_df[estimation_sample,]), direction = "both")
+summary(lm.fe_step)
+```
 
 # Random forest
 ```{r}
 library("randomForest")
-```
-```{r}
-f = paste("as.factor(rating) ~ Nr_of_words + ", allEmotions)
+
+f <- "as.factor(rating) ~ Nr_of_words + factor1 + factor3 + factor6 + 
+    factor7 + factor8 + factor9 + factor10 + factor13 + factor16 + 
+    factor19 + fall + anticipation + disgust + joy + trust + 
+    factor20 + fit + size + wear + love + color + fabric + nice + 
+    flatter + jean + feel + style + purchas + line + positive + 
+    dress_dress + dress_wear + arm_hole + size_6 + dress_beauti + 
+    wear_size + super_cute + true_size + love_dress + fit_not + 
+    love_sweater + top_fit + skinni_jean + love_shirt + agre_review + 
+    bought"
 rf = randomForest(formula(f),  
-                   ntree = 100,
+                   ntree = 60,
                    data = reviews_df[estimation_sample,])
 plot(rf)
 print(rf)
@@ -401,7 +445,7 @@ print(rf)
 ```{r}
 varImpPlot(rf,  
            sort = T,
-           n.var = 10,
+           n.var = 20,
            main = "Variable Importance")
 ```
 
@@ -423,6 +467,8 @@ print("validation")
 confusionMatrix(data = pred.test,  
                 reference = as.factor(reviews_df[test_sample,"rating"]))
 ```
+
+
 
 
 
