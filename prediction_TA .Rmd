@@ -4,7 +4,7 @@ output: html_notebook
 
 
 ```{r}
-# Loading the package ----
+# Loading necessary packages 
 library(dplyr)
 library(ggplot2)
 library(tidytext)
@@ -12,7 +12,6 @@ library(SnowballC)
 library(syuzhet)
 library(tidyr)
 library(qdap)
-#lecture 1
 library(tidyverse)
 library(tokenizers)
 library(tm)
@@ -20,20 +19,16 @@ library(stringi)
 library(ggrepel)
 library(wordcloud)
 library(readr)
-#lecture 2
 library(smacof)
 library(ggfortify)
 library(ggthemes)
 library(stats)
 library(quanteda)
 library(magrittr)
-#mds pcs
 library(factoextra)
-#lecture 3
 library(syuzhet)
 library(RDRPOSTagger)
 library(data.table)
-#lecture4
 library(gtools)
 library(combinat)
 library(NMF)
@@ -41,7 +36,7 @@ library(tidyr)
 ```
 
 ```{r}
-# Import and clean the data set  ----
+# Import and clean the data set 
 wd <- "~/Documents/R"
 reviews_df <- read_csv("~/Desktop/Text-Analytics-_files/Womens Clothing E-Commerce Reviews.csv")
 names(reviews_df)[5] <- "reviewtext"
@@ -53,7 +48,7 @@ reviews_df <- reviews_df[!(reviews_df$reviewtext == " "), ]
 reviews_df$Rating_b <- "happy"
 reviews_df[reviews_df$Rating < 4,]$Rating_b <- "unhappy"
 
-# punctuation
+# Remove punctuation
 reviews_df$Review <- as.character(reviews_df$text_full)  %>% 
   tolower() %>% 
   {gsub(":( |-|o)*\\("," SADSMILE ", .)} %>%       # Find :( or :-( or : ( or :o(
@@ -81,7 +76,7 @@ names(reviews_df)[1] <- "User_ID"
 reviews_df[,1] <- reviews_df[,1]+1
 names(reviews_df)[3] <- "rating"
 
-# remove stop words ---- 
+# Remove stop words 
 ignorelist = stop_words %>% filter(!word %in% c("no", "not", "never"))
 
 for (j in 1:nrow(reviews_df)) {
@@ -125,8 +120,7 @@ sel_bigrams
 
 
 ```{r}
-# Analyze bi-grams and look at bigrams where first word is no, never, or not
-
+# Analyze bi-grams
 bigrams_sep <-  separate(all_bigrams, bigram, c("word1", "word2"), sep = " ")
 bigrams_sep[1:20,]
 ```
@@ -173,20 +167,15 @@ reviews_df$stemmed_reviewtext <-
 ```
 
 ```{r}
-
 # Get document term matrix ---- 
 
-# Get document term matrix uni-grams
 reviews_df$User_ID <- as.character(reviews_df$User_ID) %>% as.factor() 
-# The factor may have more values than are actually present. 
-# These are removed here, as this causes an error in prcomp
 
 review_dtm <- reviews_df %>% 
   unnest_tokens(word, stemmed_reviewtext) %>% 
   dplyr::count(User_ID, word, sort=TRUE) %>% 
   ungroup() %>%
   cast_dtm(User_ID,word,n)
-
 
 #Get document term matrix for bi-grams 
 
@@ -203,7 +192,7 @@ review_dtm_bi <- review_dtm_bi %>%
 
 
 ```{r}
-# Run PCA on DTM ----
+# Principal Component Analysis  
 N_factors   <- 20
 pca_results <- prcomp(review_dtm, scale = FALSE, rank. = N_factors)  #get the 20 most important factors
 rawLoadings <- pca_results$rotation[, 1:N_factors] %*% diag(pca_results$sdev, N_factors, N_factors)
@@ -228,7 +217,6 @@ for (j in 1:N_factors) {
 }
 factor_labels
 
-
 # Add indicators for 50 most common words ----
 
 counts <- colSums(as.matrix(review_dtm)) %>% sort(decreasing=TRUE)
@@ -239,7 +227,6 @@ word_labels    <- (names(counts)[1:N_words_stored])
 reviews_df     <- data.frame(reviews_df, words = as.matrix(review_dtm[,word_labels]))
 names(reviews_df)[(lastcol+1):(lastcol+N_words_stored)] <- word_labels
 
-
 # Add inferred emotions ---- 
 
 nrc_emotions  <- get_nrc_sentiment(reviews_df$reviewtext)
@@ -249,7 +236,7 @@ reviews_df <- data.frame(reviews_df, nrc_emotions)
 
 
 ```{r}
-# Add bigrams ----
+# Adding bigrams ----
 
 review_dtm_bi <- as.matrix(review_dtm_bi)
 reviews_df <- cbind(reviews_df, review_dtm_bi[match(rownames(reviews_df), rownames(review_dtm_bi)),])
@@ -261,9 +248,9 @@ names(reviews_df) <- gsub(" ", "_", names(reviews_df), fixed = TRUE)
 
 
 ```{r}
-# preparation of the predictive features ---- 
+# Preparation of the predictive features ---- 
 N_factors <- 20
-N_emotions <- 10 # includes pos/neg
+N_emotions <- 10 
 N_words_stored <- 50
 N_bigrams_stored <- 71
 
@@ -277,27 +264,27 @@ index <- index + N_emotions
 bigramnames <- colnames(reviews_df)[index:(index+N_bigrams_stored-1)]
 index <- index + N_bigrams_stored
 
-set.seed(1234)    # fix seed to allow for results to be reproducible
+set.seed(1234)    
 estimation_sample <- sort(sample(1:nrow(reviews_df), size = round(0.7*nrow(reviews_df))))
 test_sample <- (1:nrow(reviews_df))[-estimation_sample]
 ```
 
 
 ```{r}
-# Prepare some strings for efficient use in model definitions
+# Prepare strings 
 
 allFactors <- paste("(", paste(factornames,collapse=" + "), ")")
 allEmotions <- paste("(", paste(emotionnames,collapse=" + "), ")")
 allWords <- paste("(", paste(wordnames,collapse=" + "), ")")
 allBigrams <- paste("(", paste(bigramnames,collapse=" + "), ")")
 allWordsAndBigrams <- paste("(", paste(c(wordnames, bigramnames),collapse=" + "), ")")
-# show example
+
 allFactors
 ```
 
 
 ```{r}
-# Basic linear model (without interactions and variable selection) ---- 
+# Basic linear model (without interactions and variable selection), different features and combinations ---- 
 
 f <- paste("rating ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
 lm.all <- lm(f, data=reviews_df[estimation_sample,] )
@@ -332,6 +319,7 @@ f <- paste("rating ~ Nr_of_words + positive + negative")
 lm.posneg <- lm(f, data = reviews_df[estimation_sample,])
 summary(lm.posneg)
 
+# Optimal model through backward selection
 f <- "rating ~ Nr_of_words + factor1 + factor3 + factor6 + 
     factor7 + factor8 + factor9 + factor10 + factor13 + factor16 + 
     factor19 + fall + anticipation + disgust + joy + trust + 
@@ -344,21 +332,18 @@ f <- "rating ~ Nr_of_words + factor1 + factor3 + factor6 +
 lm.optimal <- lm(f, data = reviews_df[estimation_sample,])
 summary(lm.optimal)
 
-#predictive performance
+#predictive performance of model with all features
 lm.all_predict <- predict(lm.all,data = reviews_df[test_sample,])
 t.test(reviews_df[test_sample,"rating"], lm.all_predict)
 
-#predictive performance
+#Predictive performance of model with subset of features based on backward selection (optimal model)
 lm.optimal_predict <- predict(lm.optimal,data = reviews_df[test_sample,])
 t.test(reviews_df[test_sample,"rating"], lm.optimal_predict)
-
-#make a confusion matrix 
 ```
 
 
 ```{r}
-
-# AIC comparison
+# AIC comparison for all linear models 
 
 AIC(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg, lm.optimal)
 ```
@@ -374,7 +359,8 @@ anova(lm.all, lm.onlyemotions)
 ```
 
 ```{r}
-# take happy or unhappy as the dependent variable
+# take happy or unhappy as the binary dependent variable, did not pursue. 
+
 #reviews_df$Rating_b<- ifelse(reviews_df$Rating_b == "happy",1,0)
 
 #f <- paste("Rating_b ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
@@ -432,7 +418,7 @@ anova(lm.all, lm.onlyemotions)
 
 
 ```{r}
-#Predictive performance
+#Predictive performance of all linear models and combinations - 
 
 for (m in list(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg, lm.optimal))
 {
@@ -447,6 +433,30 @@ print("lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigr
 ```
 
 ```{r}
+#Variable importance using t-values of the linear model with all features
+library(caret)
+vi <- varImp(lm.optimal) 
+vi$Variable <- rownames(vi)
+vi <- vi[order(-vi$Overall),]
+vi$Variable <- factor(vi$Variable, levels = rev(vi$Variable))
+
+ggplot(vi[1:25, ], aes(Variable,Overall)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (t-value based) for linear model with optimal features")
+
+#ggplot(vi[(nrow(vi)-24):nrow(vi), ], aes(Variable,Overall)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (t-value) for linear model with all features")
+
+# Variable importance using standardized coefficients
+#library("matrixStats")
+#vi <- coef(lm.optimal)/sqrt(colVars(model.matrix(formula(lm.optimal), data=reviews_df[estimation_sample,])))
+#StdCoef <- data.frame(StdCoef=vi[2:length(vi)])
+#StdCoef$Variable <- rownames(StdCoef)
+#StdCoef <- StdCoef[order(- StdCoef$StdCoef),]
+#StdCoef$Variable <- factor( StdCoef$Variable, levels = rev( StdCoef$Variable))
+
+#StdCoef <-  StdCoef[1:25,]
+#ggplot( StdCoef, aes(Variable,StdCoef)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (standardized coefficients)")
+```
+
+```{r}
 #Variable importance using t-values of the optimal linear model
 library(caret)
 vi <- varImp(lm.optimal) #vs. lm. all
@@ -454,66 +464,60 @@ vi$Variable <- rownames(vi)
 vi <- vi[order(-vi$Overall),]
 vi$Variable <- factor(vi$Variable, levels = rev(vi$Variable))
 
-ggplot(vi[1:25, ], aes(Variable,Overall)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (t-value based)")
+ggplot(vi[1:25, ], aes(Variable,Overall)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (t-value based) for linear model with optimal features")
 
-ggplot(vi[(nrow(vi)-24):nrow(vi), ], aes(Variable,Overall)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (t-value based)")
-
-# Variable importance using standardized coefficients
-library("matrixStats")
-vi <- coef(lm.optimal)/sqrt(colVars(model.matrix(formula(lm.optimal), data=reviews_df[estimation_sample,])))
-StdCoef <- data.frame(StdCoef=vi[2:length(vi)])
-StdCoef$Variable <- rownames(StdCoef)
-StdCoef <- StdCoef[order(- StdCoef$StdCoef),]
-StdCoef$Variable <- factor( StdCoef$Variable, levels = rev( StdCoef$Variable))
-
-StdCoef <-  StdCoef[1:25,]
-ggplot( StdCoef, aes(Variable,StdCoef)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (standardized coefficients)")
+#ggplot(vi[(nrow(vi)-24):nrow(vi), ], aes(Variable,Overall)) + geom_bar(stat = "identity") + coord_flip() + ylab("Variable importance (t-value) for linear model with all features")
 ```
 
 ```{r}
-#backward selection
+# Backward selection
 f <- paste("rating ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
 lm.fe_step <- step(lm(f, data = reviews_df[estimation_sample,]), direction = "both")
 summary(lm.fe_step)
 ```
 
-# Random forest
 ```{r}
+# Random Forest Model 
 library("randomForest")
 
-f <- paste("as.factor(rating) ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
+f <- paste("rating ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
 rf = randomForest(formula(f),  
                    ntree = 100,
-                   data = reviews_df[estimation_sample,])
+                   data = reviews_df[estimation_sample,],
+                   importance = TRUE)
 plot(rf)
 print(rf) #linear model works better -overfitting, works only for the estimation sample. LINEAR MODEL WINS YAY
 ```
 
 ```{r}
+# Variable Importance based on Random Forest Model 
 varImpPlot(rf,  
            sort = T,
            n.var = 25,
-           main = "Variable Importance") #pca results have a strong importance compared to others, followed by emotions and words. No bigrams present. Random forest does not balance and account for all features available. 
+           main = "Variable Importance") #pca results have a strong importance compared to others, followed by emotions and words. No bigrams present. Random forest does not balance and account for all features available. MeanDecreaseGini is biased towards numeric vectors and categorical variables, therefore we look at the MeanDecreaseAccuracy  
+           
 ```
 
 ```{r}
+# Predictive Performance of Random Forest Model  
 library(caret)
-pred.alt <- predict(rf)
-print("estimation_oob")
-confusionMatrix(data = pred.alt,  
-                reference = as.factor(reviews_df[estimation_sample,"rating"]))
-
+pred.all <- predict(rf) #mse is better for linear model, accuracy is better. Random forest takes longer
+print("overall_rmse")
+mse_all <- mean((as.numeric(reviews_df[,"rating"])-pred.all)^2)
+print(sqrt(mse_all))
 
 pred.est <- predict(rf, reviews_df[estimation_sample,])
-print("estimation_insample")
-confusionMatrix(data = pred.est,  
-                reference = as.factor(reviews_df[estimation_sample,"rating"]))
+print("estimation_rmse")
+mse_est <- mean((as.numeric(reviews_df[estimation_sample,"rating"])-pred.est)^2)
+print(sqrt(mse_est))
 
 pred.test <- predict(rf, reviews_df[test_sample,])
-print("validation")
-confusionMatrix(data = pred.test,  
-                reference = as.factor(reviews_df[test_sample,"rating"])) #accuracy measure does not support random forest model. Random forest PCA is most effective feature. Reason for overfitting?? mainly use PCA features and those features might lead to overfitting, features are not well balanced- can't make out what the main focus per factor is.
+print("test_mse")
+mse_test <- mean((as.numeric(reviews_df[test_sample,"rating"])-pred.test)^2)
+print(sqrt(mse_test))
+#accuracy measure does not support random forest model. Random forest PCA is most effective feature. Reason for overfitting?? mainly use PCA features and those features might lead to overfitting, features are not well balanced- can't make out what the main focus per factor is.
 ```
+
 
 ```{r}
 # Lasso regression for all features ----
@@ -544,7 +548,13 @@ nnzero(par)
 
 lasso.pred <- predict(lasso.mod, s = cvfit$lambda.1se, newx = LargeX[estimation_sample,])
 lasso.pred.test <- predict(lasso.mod, s = cvfit$lambda.1se, newx = LargeX[test_sample,])
-mean((reviews_df[test_sample, "rating"]-lasso.pred.test)^2)
+
+#RM
+MSE_lasso_all_est <- mean((reviews_df[estimation_sample, "rating"]-lasso.pred)^2)
+print(sqrt(MSE_lasso_all_est))
+
+MSE_lasso_all <- mean((reviews_df[test_sample, "rating"]-lasso.pred.test)^2)
+print(sqrt(MSE_lasso_all))
 ```
 
 
@@ -586,6 +596,14 @@ nnzero(par)
 
 lasso.pred <- predict(lasso.mod, s = cvfit$lambda.1se, newx = LargeX[estimation_sample,])
 lasso.pred.test <- predict(lasso.mod, s = cvfit$lambda.1se, newx = LargeX[test_sample,])
-mean((reviews_df[test_sample, "rating"]-lasso.pred.test)^2) #mean squared error keeps on increasing 
+
+MSE_lasso_optimal_est <- mean((reviews_df[estimation_sample, "rating"]-lasso.pred)^2)
+print(sqrt(MSE_lasso_optimal_est))
+
+MSE_lasso_optimal <-mean((reviews_df[test_sample, "rating"]-lasso.pred.test)^2) 
+print(sqrt(MSE_lasso_optimal))
+#mean squared error keeps on increasing
 ```
+
+
 
