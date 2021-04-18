@@ -1,0 +1,131 @@
+---
+title: "R Notebook"
+output:
+  html_notebook:
+    toc: yes
+  word_document:
+    toc: yes
+---
+
+```{r}
+#loading data from previous assignment.
+#reviews already merged
+load("reviews_df_2.0.RData")
+
+```
+
+```{r libs}
+library(dplyr)
+library(tidyr)
+library(text2vec)
+library(tidytext)
+library(ggplot2)
+library(SnowballC)
+library(qdap)
+```
+
+```{r}
+review_df_2_0$Puct_rem <- as.character(review_df_2_0$text_full) %>%
+                            tolower() %>%
+                            replace_abbreviation() %>%
+                            replace_contraction() %>%
+                            {gsub(":( |-|o)*\\("," SADSMILE ", .)} %>%       # Find :( or :-( or : ( or :o(
+                            {gsub(":( |-|o)*\\)"," HAPPYSMILE ", .)} %>%     # Find :) or :-) or : ) or :o)
+                            {gsub("(\"| |\\$)-+\\.-+"," NUMBER", .)} %>%     # Find numbers
+                            {gsub("(-+:)*-+ *am"," TIME_AM", .)} %>%         # Find time AM
+                            {gsub("(-+:)*-+ *pm"," TIME_PM", .)} %>%         # Find time PM
+                            {gsub("-+:-+","TIME", .)} %>%                    # Find general time
+                            {gsub("[[:punct:]]", " ",.)} %>%                 
+                            {gsub("([0-9])+"," NUMBER", .)} %>%              # Find numbers
+                            {gsub(" +"," ", .)}                              # Remove excess spaces
+
+
+for (j in 1:nrow(review_df_2_0)) {
+  stemmed_description<-  anti_join((review_df_2_0[j,] %>% unnest_tokens(word,Puct_rem, drop=FALSE,to_lower=TRUE) ),stop_words)
+  stemmed_description<-  (review_df_2_0[j,] %>% unnest_tokens(word,Puct_rem, drop=FALSE,to_lower=TRUE) )
+  stemmed_description<-(wordStem(stemmed_description[,"word"], language = "porter"))
+
+  review_df_2_0[j, "S_WS_NP"] <- paste(stemmed_description, collapse = " ")
+
+}
+```
+
+```{r take sample for convenience if needed}
+reviews_df <- review_df_2_0
+```
+
+```{r Pre-process and get TCM and set window}
+#create iterator over list of text items
+it = itoken(reviews_df$S_WS_NP)
+
+#create the vocabulary and remove infrequent words
+vocabulary <- create_vocabulary(it)
+vocabulary <- prune_vocabulary(vocabulary, term_count_min = 50)
+
+#create vector version of the vocabulary: speeds up allocation/search process
+v_vect <- vocab_vectorizer(vocabulary)
+tcm <- create_tcm(it, v_vect, skip_grams_window = 6L, skip_grams_window_context = "symmetric", weights = rep(1,6) ) # create term co-occurrence matrix
+
+```
+
+```{r termcount matrix vis-peek, echo=FALSE}
+printable_tcm <- as.matrix(tcm) + t(as.matrix(tcm))  # in sparse representation only half the numbers of symmetric matrix are stored. 
+diag(printable_tcm) <- diag(printable_tcm) - diag(as.matrix(tcm)) #avoid double counting diagonal
+printable_tcm <- cbind(printable_tcm , term_count = vocabulary$term_count) # include term counts on diagonal
+wordlist <- c("season", "love" , "summer" , "color", "winter", "bad", "cheap", "nice", "perfect", "cold", "warm", "comfi", "comfort")
+cbind(printable_tcm[wordlist, wordlist],printable_tcm[wordlist, "term_count"])
+```
+
+```{r}
+glove_model <- GlobalVectors$new(x_max = 250 , rank = 50)
+word_vectors <- glove_model$fit_transform(tcm, n_iter = 200)
+```
+
+```{r}
+similarity_matrix <- sim2(word_vectors)
+print("a sample of the similarity matrix across words ")
+similarity_matrix[wordlist,wordlist]
+nwords <-nrow(similarity_matrix)
+top_bottom <- c(1:10,(nwords-9):nwords)
+```
+
+```{r echo=FALSE}
+comparator <- word_vectors["season",]
+comparator <- word_vectors["summer",]
+comparator <- word_vectors["winter",]
+comparator <- word_vectors["fall",]
+comparator <- word_vectors["spring",]
+similarities <- sim2(word_vectors,t(comparator))
+ranking = similarities %>% order(decreasing=TRUE)
+print(as.data.frame(similarities[ranking[top_bottom]], row.names = vocabulary$term[ranking[top_bottom]]))
+```
+
+```{r echo=FALSE}
+comparator <- word_vectors["top",]
+comparator <- word_vectors["shirt",]
+comparator <- word_vectors["sweater",]
+similarities <- sim2(word_vectors,t(comparator))
+ranking = similarities %>% order(decreasing=TRUE)
+print(as.data.frame(similarities[ranking[top_bottom]], row.names = vocabulary$term[ranking[top_bottom]]))
+```
+
+```{r echo=FALSE}
+comparator <- word_vectors["bad",]
+comparator <- word_vectors["perfect",]
+comparator <- word_vectors["cheap",]
+comparator <- word_vectors["poor",]
+comparator <- word_vectors["love",]
+similarities <- sim2(word_vectors,t(comparator))
+ranking = similarities %>% order(decreasing=TRUE)
+print(as.data.frame(similarities[ranking[top_bottom]], row.names = vocabulary$term[ranking[top_bottom]]))
+```
+
+```{r echo=FALSE}
+comparator <- word_vectors["top",] + word_vectors["winter",] - word_vectors["summer",]
+similarities <- sim2(word_vectors,t(comparator))
+ranking = similarities %>% order(decreasing=TRUE)
+print(as.data.frame(similarities[ranking[top_bottom]], row.names = vocabulary$term[ranking[top_bottom]]))
+```  
+
+
+
