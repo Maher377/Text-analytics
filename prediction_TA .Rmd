@@ -160,7 +160,6 @@ toremove
 ```{r}
 # Remove common words from stemmed reviewtext
 
-
 for (j in 1:nrow(reviews_df)) 
 {
   tmp <-  anti_join( (reviews_df[j,] %>% unnest_tokens(word, stemmed_reviewtext) ), toremove, by = "word") 
@@ -214,7 +213,6 @@ pca_results$rotation <- rotated$loadings
 pca_results$x <- scale(pca_results$x[,1:N_factors]) %*% rotated$rotmat 
 ```
 
-pca_results$
 
 ```{r}
 # Add the factors to the data frame
@@ -346,6 +344,15 @@ f <- "rating ~ Nr_of_words + factor1 + factor3 + factor6 +
 lm.optimal <- lm(f, data = reviews_df[estimation_sample,])
 summary(lm.optimal)
 
+#predictive performance
+lm.all_predict <- predict(lm.all,data = reviews_df[test_sample,])
+t.test(reviews_df[test_sample,"rating"], lm.all_predict)
+
+#predictive performance
+lm.optimal_predict <- predict(lm.optimal,data = reviews_df[test_sample,])
+t.test(reviews_df[test_sample,"rating"], lm.optimal_predict)
+
+#make a confusion matrix 
 ```
 
 
@@ -353,33 +360,81 @@ summary(lm.optimal)
 
 # AIC comparison
 
-AIC(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg, lm.fe_step)
+AIC(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg, lm.optimal)
 ```
 
 
 ```{r}
 # Test some nested models
 
-anova(lm.nodict, lm.all)
+anova(lm.all, lm.optimal)
 anova(lm.posneg, lm.onlyemotions)
 anova(lm.words_bigrams, lm.all)
 anova(lm.all, lm.onlyemotions)
 ```
 
 ```{r}
-# Plot prediction histograms
-library(ggplot2)
-dat <- data.frame(Prediction=predict(lm.all), rating=reviews_df[estimation_sample, "rating"])
-ggplot(dat, aes(x=Prediction))  + 
-  geom_histogram(data=subset(dat,rating == 1),fill = "red", alpha = 0.2) +
-  geom_histogram(data=subset(dat,rating == 2),fill = "blue", alpha = 0.2)
+# take happy or unhappy as the dependent variable
+#reviews_df$Rating_b<- ifelse(reviews_df$Rating_b == "happy",1,0)
+
+#f <- paste("Rating_b ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
+#lm.all <- lm(f, data=reviews_df[estimation_sample,] )
+#summary(lm.all)
+
+#f <- paste("Rating_b ~ Nr_of_words + ", allFactors, " + ", allWords , " + ", allBigrams)
+#lm.nodict <- lm(f, data=reviews_df[estimation_sample,] )
+#summary(lm.nodict)
+
+#f <- paste("Rating_b ~  Nr_of_words + ", allFactors)
+#lm.onlyfactors <- lm(f, data = reviews_df[estimation_sample, ])
+#summary(lm.onlyfactors)
+
+#f <- paste("Rating_b ~  Nr_of_words + ", allEmotions)
+#lm.onlyemotions <- lm(f, data = reviews_df[estimation_sample,])
+#summary(lm.onlyemotions)
+
+#f <- paste("Rating_b ~ Nr_of_words + ", allWords)
+#lm.onlywords <- lm(f, data = reviews_df[estimation_sample,])
+#summary(lm.onlywords)
+
+#f <- paste("Rating_b ~ Nr_of_words + ", allBigrams)
+#lm.bigrams <- lm(f, data = reviews_df[estimation_sample,])
+#summary(lm.bigrams)
+
+
+#f <- paste("Rating_b ~ Nr_of_words + ", allWords , " + ",allBigrams)
+#lm.words_bigrams <- lm(f, data = reviews_df[estimation_sample,])
+#summary(lm.words_bigrams)
+
+#f <- paste("Rating_b ~ Nr_of_words + positive + negative")
+#lm.posneg <- lm(f, data = reviews_df[estimation_sample,])
+#summary(lm.posneg)
+
+#f <- Rating_b ~ Nr_of_words + factor1 + factor3 + factor6 + factor7 + factor8 + factor9 + factor10 + factor13 + factor16 + factor19 + fall + anticipation + disgust + joy + trust + factor20 + fit + size + wear + love + color + fabric + nice + flatter + jean + feel + style + purchas + line + positive + dress_dress + dress_wear + arm_hole + size_6 + dress_beauti + wear_size + super_cute + true_size + love_dress + fit_not + love_sweater + top_fit + skinni_jean + love_shirt + agre_review + bought
+#lm.optimal <- lm(f, data = reviews_df[estimation_sample,])
+#summary(lm.optimal)
+
+# AIC comparison
+#AIC(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg, lm.optimal)
+
 ```
+
+
+```{r}
+# Plot prediction histograms
+#library(ggplot2)
+#dat <- data.frame(Prediction=predict(lm.optimal), rating=reviews_df[estimation_sample, "rating"])
+#ggplot(dat, aes(x=Prediction))  + 
+  #geom_histogram(data=subset(dat,rating == 1),fill = "red", alpha = 0.2) +
+  #geom_histogram(data=subset(dat,rating == 2),fill = "blue", alpha = 0.2) +
+```
+
 
 
 ```{r}
 #Predictive performance
 
-for (m in list(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg))
+for (m in list(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg, lm.optimal))
 {
   predicted <- predict.lm(m, reviews_df[estimation_sample,])
   mse <- mean((as.numeric(reviews_df[estimation_sample,"rating"])-predicted)^2)
@@ -388,13 +443,13 @@ for (m in list(lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords,
   mse_test<- mean((as.numeric(reviews_df[test_sample,"rating"])-predicted_test)^2)
   print(c(sqrt(mse), sqrt(mse_test)))
 }
-print("lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg")
+print("lm.all, lm.nodict, lm.onlyfactors, lm.onlyemotions, lm.onlywords, lm.bigrams, lm.words_bigrams, lm.posneg, lm.optimal")
 ```
 
 ```{r}
-#Variable importance using t-values
+#Variable importance using t-values of the optimal linear model
 library(caret)
-vi <- varImp(lm.all)
+vi <- varImp(lm.optimal) #vs. lm. all
 vi$Variable <- rownames(vi)
 vi <- vi[order(-vi$Overall),]
 vi$Variable <- factor(vi$Variable, levels = rev(vi$Variable))
@@ -405,7 +460,7 @@ ggplot(vi[(nrow(vi)-24):nrow(vi), ], aes(Variable,Overall)) + geom_bar(stat = "i
 
 # Variable importance using standardized coefficients
 library("matrixStats")
-vi <- coef(lm.all)/sqrt(colVars(model.matrix(formula(lm.all), data=reviews_df[estimation_sample,])))
+vi <- coef(lm.optimal)/sqrt(colVars(model.matrix(formula(lm.optimal), data=reviews_df[estimation_sample,])))
 StdCoef <- data.frame(StdCoef=vi[2:length(vi)])
 StdCoef$Variable <- rownames(StdCoef)
 StdCoef <- StdCoef[order(- StdCoef$StdCoef),]
@@ -426,27 +481,19 @@ summary(lm.fe_step)
 ```{r}
 library("randomForest")
 
-f <- "as.factor(rating) ~ Nr_of_words + factor1 + factor3 + factor6 + 
-    factor7 + factor8 + factor9 + factor10 + factor13 + factor16 + 
-    factor19 + fall + anticipation + disgust + joy + trust + 
-    factor20 + fit + size + wear + love + color + fabric + nice + 
-    flatter + jean + feel + style + purchas + line + positive + 
-    dress_dress + dress_wear + arm_hole + size_6 + dress_beauti + 
-    wear_size + super_cute + true_size + love_dress + fit_not + 
-    love_sweater + top_fit + skinni_jean + love_shirt + agre_review + 
-    bought"
+f <- paste("as.factor(rating) ~ Nr_of_words + ", allFactors, " + ", allEmotions, " + ", allWords , " + ", allBigrams)
 rf = randomForest(formula(f),  
-                   ntree = 60,
+                   ntree = 100,
                    data = reviews_df[estimation_sample,])
 plot(rf)
-print(rf)
+print(rf) #linear model works better -overfitting, works only for the estimation sample. LINEAR MODEL WINS YAY
 ```
 
 ```{r}
 varImpPlot(rf,  
            sort = T,
-           n.var = 20,
-           main = "Variable Importance")
+           n.var = 25,
+           main = "Variable Importance") #pca results have a strong importance compared to others, followed by emotions and words. No bigrams present. Random forest does not balance and account for all features available. 
 ```
 
 ```{r}
@@ -465,10 +512,80 @@ confusionMatrix(data = pred.est,
 pred.test <- predict(rf, reviews_df[test_sample,])
 print("validation")
 confusionMatrix(data = pred.test,  
-                reference = as.factor(reviews_df[test_sample,"rating"]))
+                reference = as.factor(reviews_df[test_sample,"rating"])) #accuracy measure does not support random forest model. Random forest PCA is most effective feature. Reason for overfitting?? mainly use PCA features and those features might lead to overfitting, features are not well balanced- can't make out what the main focus per factor is.
+```
+
+```{r}
+# Lasso regression for all features ----
+
+library(glmnet)
+library(plotmo) # for plot_glmnet
+
+f = paste("~ 0 + Nr_of_words + ", allFactors, " * ", allEmotions, " + ", allWords, " + ", allBigrams)
+
+# Collect explanatory variables in a (large) matrix
+LargeX <- model.matrix(formula(f), data=reviews_df)
+y <- as.matrix(reviews_df[estimation_sample, "rating"])
+
+lasso.mod <- glmnet(LargeX[estimation_sample,], y, alpha = 1)
+
+plot_glmnet(lasso.mod) 
+plot(lasso.mod)
+
+cvfit <- cv.glmnet(LargeX[estimation_sample,], y, alpha = 1)
+plot(cvfit)
+
+coef(lasso.mod, cvfit$lambda.1se)
+
+par <- predict(lasso.mod, s = cvfit$lambda.min, type='coefficients')
+nnzero(par)
+par <- predict(lasso.mod, s = cvfit$lambda.1se, type='coefficients')
+nnzero(par)
+
+lasso.pred <- predict(lasso.mod, s = cvfit$lambda.1se, newx = LargeX[estimation_sample,])
+lasso.pred.test <- predict(lasso.mod, s = cvfit$lambda.1se, newx = LargeX[test_sample,])
+mean((reviews_df[test_sample, "rating"]-lasso.pred.test)^2)
 ```
 
 
+```{r}
+# Lasso regression for optimal features ----
 
+library(glmnet)
+library(plotmo) # for plot_glmnet
 
+f = paste("~ 0 + Nr_of_words + ", allFactor)
+f_optimal <- "~ 0 +  Nr_of_words + factor1 + factor3 + factor6 +
+    factor7 + factor8 + factor9 + factor10 + factor13 + factor16 + 
+    factor19 + fall + anticipation + disgust + joy + trust + 
+    factor20 + fit + size + wear + love + color + fabric + nice + 
+    flatter + jean + feel + style + purchas + line + positive + 
+    dress_dress + dress_wear + arm_hole + size_6 + dress_beauti + 
+    wear_size + super_cute + true_size + love_dress + fit_not + 
+    love_sweater + top_fit + skinni_jean + love_shirt + agre_review + 
+    bought"
+
+# Collect explanatory variables in a (large) matrix
+LargeX <- model.matrix(formula(f_optimal), data=reviews_df)
+y <- as.matrix(reviews_df[estimation_sample, "rating"])
+
+lasso.mod <- glmnet(LargeX[estimation_sample,], y, alpha = 1)
+
+plot_glmnet(lasso.mod) 
+plot(lasso.mod)
+
+cvfit <- cv.glmnet(LargeX[estimation_sample,], y, alpha = 1)
+plot(cvfit)
+
+coef(lasso.mod, cvfit$lambda.1se)
+
+par <- predict(lasso.mod, s = cvfit$lambda.min, type='coefficients')
+nnzero(par)
+par <- predict(lasso.mod, s = cvfit$lambda.1se, type='coefficients')
+nnzero(par)
+
+lasso.pred <- predict(lasso.mod, s = cvfit$lambda.1se, newx = LargeX[estimation_sample,])
+lasso.pred.test <- predict(lasso.mod, s = cvfit$lambda.1se, newx = LargeX[test_sample,])
+mean((reviews_df[test_sample, "rating"]-lasso.pred.test)^2) #mean squared error keeps on increasing 
+```
 
